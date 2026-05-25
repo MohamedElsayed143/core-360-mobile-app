@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "943095263495",
+    "project_id": "core-360-bbf64",
+    "storage_bucket": "core-360-bbf64.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:943095263495:android:857e2f3ef812ebce4e95a2",
+        "android_client_info": {
+          "package_name": "com.example.core_360_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPbqXWzdlvaOAA7McsQeENi_kBgpEspYE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

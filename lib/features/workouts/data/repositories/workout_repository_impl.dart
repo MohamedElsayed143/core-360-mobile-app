@@ -16,15 +16,131 @@ class WorkoutRepositoryImpl implements WorkoutRepository {
 
   @override
   Future<List<Exercise>> getGlobalWorkouts() async {
-    final querySnapshot = await _client.workoutsCollection.get();
-    return querySnapshot.docs.map((doc) => ExerciseModel.fromFirestore(doc)).toList();
+    try {
+      final querySnapshot = await _client.workoutsCollection.get();
+      final list = querySnapshot.docs.map((doc) => ExerciseModel.fromFirestore(doc)).toList();
+      if (list.isNotEmpty) {
+        return list;
+      }
+    } catch (_) {}
+
+    // Fallback list of 12 standard premium workouts so that exercises ALWAYS appear initially without manual seeding
+    return [
+      Exercise(
+        id: 'bench_press_001',
+        title: 'Barbell Bench Press',
+        description: 'A classic upper-body strength exercise that targets chest, front deltoids, and triceps.',
+        targetMuscle: 'chest',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/bench_press.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=rT7DgCr-3pg',
+        aiSupported: false,
+      ),
+      Exercise(
+        id: 'push_ups_002',
+        title: 'Push-Up',
+        description: 'A bodyweight exercise targeting the chest, shoulders, triceps, and core stability.',
+        targetMuscle: 'chest',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/push_ups.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=IODxDxX7oi4',
+        aiSupported: true,
+      ),
+      Exercise(
+        id: 'squats_003',
+        title: 'Bodyweight Squat',
+        description: 'A fundamental lower body movement targeting quadriceps, glutes, and hamstrings.',
+        targetMuscle: 'quadriceps',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/squat.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=aclHkVaku9U',
+        aiSupported: true,
+      ),
+      Exercise(
+        id: 'pull_ups_004',
+        title: 'Pull-Up',
+        description: 'An advanced upper body pulling movement targeting the latissimus dorsi, upper back, and biceps.',
+        targetMuscle: 'upper_back',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/pull_up.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=eGo4IYlbE5g',
+        aiSupported: false,
+      ),
+      Exercise(
+        id: 'plank_005',
+        title: 'Forearm Plank',
+        description: 'An isometric core strength exercise that maintains a straight body line.',
+        targetMuscle: 'abs',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/plank.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=B296mZDhrWY',
+        aiSupported: true,
+      ),
+      Exercise(
+        id: 'bicep_curl_006',
+        title: 'Dumbbell Bicep Curl',
+        description: 'An isolation exercise for building upper arm mass and elbow flexor strength.',
+        targetMuscle: 'biceps',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/bicep_curl.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=ykJmrZ5v0Up',
+        aiSupported: false,
+      ),
+      Exercise(
+        id: 'tricep_extension_007',
+        title: 'Overhead Dumbbell Tricep Extension',
+        description: 'Targeting the triceps brachii long head with dumbbells over the crown.',
+        targetMuscle: 'triceps',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/tricep_extension.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=X-iV-sGEL1s',
+        aiSupported: false,
+      ),
+      Exercise(
+        id: 'overhead_press_008',
+        title: 'Dumbbell Overhead Shoulder Press',
+        description: 'An excellent vertical press for shoulders, front delts, and triceps.',
+        targetMuscle: 'front_deltoids',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/overhead_press.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=B-aVuy917zQ',
+        aiSupported: false,
+      ),
+      Exercise(
+        id: 'romanian_deadlift_009',
+        title: 'Romanian Deadlift',
+        description: 'A hip hinge pattern targeting posterior chain muscles like hamstrings and glutes.',
+        targetMuscle: 'hamstring',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/romanian_deadlift.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=XowK9_K25VA',
+        aiSupported: false,
+      ),
+      Exercise(
+        id: 'calve_raises_010',
+        title: 'Standing Calf Raise',
+        description: 'Isolation movement for calf hypertrophy and ankle plantarflexion strength.',
+        targetMuscle: 'calves',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/calf_raise.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=YM21oT-Vyc4',
+        aiSupported: false,
+      ),
+      Exercise(
+        id: 'lateral_raises_011',
+        title: 'Dumbbell Lateral Raise',
+        description: 'An isolation exercise for widening the visual shoulders by working lateral deltoids.',
+        targetMuscle: 'back_deltoids',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/lateral_raise.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=3VcKaXatAM0',
+        aiSupported: false,
+      ),
+      Exercise(
+        id: 'leg_raises_012',
+        title: 'Hanging Leg Raise',
+        description: 'An advanced core movement targeting rectus abdominis and hip flexor complexes.',
+        targetMuscle: 'abs',
+        thumbnailUrl: 'https://assets.core360.app/thumbnails/leg_raise.jpg',
+        videoUrl: 'https://www.youtube.com/watch?v=hdng3Nm1x_E',
+        aiSupported: false,
+      ),
+    ];
   }
 
   @override
   Future<List<Routine>> getUserRoutines(String userId) async {
     final querySnapshot = await _client.routinesCollection
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .get();
 
     final List<Routine> routines = [];
@@ -42,6 +158,13 @@ class WorkoutRepositoryImpl implements WorkoutRepository {
 
       routines.add(RoutineModel.fromFirestore(doc, exercises));
     }
+
+    // Sort locally by createdAt descending to avoid composite index requirements
+    routines.sort((a, b) {
+      final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
+    });
 
     return routines;
   }

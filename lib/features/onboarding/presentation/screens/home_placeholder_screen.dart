@@ -4,6 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:core_360_app/core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../../../workouts/presentation/screens/workouts_dashboard_screen.dart';
+import '../../../chat/presentation/screens/chat_screen.dart';
+import '../../../workouts/presentation/screens/pose_analysis_screen.dart';
+import '../../../workouts/presentation/screens/analytics_dashboard_screen.dart';
 
 class HomePlaceholderScreen extends ConsumerWidget {
   const HomePlaceholderScreen({super.key});
@@ -269,6 +272,70 @@ class HomePlaceholderScreen extends ConsumerWidget {
                     const SizedBox(height: 32),
                   ],
 
+                  // ─── PERFORMANCE ANALYTICS BANNER ────────────────────────
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.primaryGradient,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.cyberCyan.withOpacity(0.12),
+                          blurRadius: 15,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AnalyticsDashboardScreen(),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.analytics_outlined, color: Colors.black, size: 24),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'INTELLIGENT PERFORMANCE ANALYTICS',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Monitor workout volume history, accuracy, and muscle maps',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.black87,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios, color: Colors.black54, size: 16),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
                   // ─── FUTURISTIC NEURAL ARCHITECTURE MODULES ─────────────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -323,18 +390,42 @@ class HomePlaceholderScreen extends ConsumerWidget {
                         Icons.timer_outlined,
                         'Pillar 3',
                         AppTheme.electricBlue,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const WorkoutsDashboardScreen(),
+                            ),
+                          );
+                        },
                       ),
                       _buildMockModuleCard(
                         'Pose Analysis',
                         Icons.camera_enhance_outlined,
                         'Pillar 4',
                         AppTheme.amethystPurple,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PoseAnalysisScreen(),
+                            ),
+                          );
+                        },
                       ),
                       _buildMockModuleCard(
                         'AI RAG Coach',
                         Icons.chat_bubble_outline,
                         'Pillar 5',
                         AppTheme.warningAmber,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ChatScreen(),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

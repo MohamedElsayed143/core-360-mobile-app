@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:core_360_app/core/theme/app_theme.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -22,6 +24,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
   bool _obscureConfirmPassword = true;
   late AnimationController _pulseController;
 
+  final LocalAuthentication _localAuth = LocalAuthentication();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  bool _fingerprintEnabled = false;
+  bool _canCheckBiometrics = false;
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +36,111 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat(reverse: true);
+    _checkBiometrics();
+  }
+
+  Future<void> _checkBiometrics() async {
+    try {
+      final canCheck = await _localAuth.canCheckBiometrics;
+      final isSupported = await _localAuth.isDeviceSupported();
+      setState(() {
+        _canCheckBiometrics = canCheck && isSupported;
+      });
+    } catch (_) {}
+  }
+
+  Future<bool> _authenticateBiometrics() async {
+    try {
+      final authenticated = await _localAuth.authenticate(
+        localizedReason: 'Scan fingerprint to authenticate secure access to Core-360',
+        options: const AuthenticationOptions(
+          biometricOnly: true,
+          stickyAuth: true,
+        ),
+      );
+      return authenticated;
+    } catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'BIOMETRIC INITIALIZATION FAILED: $e',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return false;
+    }
+  }
+
+  Future<void> _handleFingerprintToggle(bool val) async {
+    if (!val) {
+      setState(() {
+        _fingerprintEnabled = false;
+      });
+      return;
+    }
+
+    try {
+      final canCheck = await _localAuth.canCheckBiometrics;
+      final isSupported = await _localAuth.isDeviceSupported();
+      if (!mounted) return;
+      if (!canCheck || !isSupported) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'BIOMETRICS NOT AVAILABLE ON THIS DEVICE.',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: AppTheme.amethystPurple,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        setState(() {
+          _fingerprintEnabled = false;
+        });
+        return;
+      }
+
+      final success = await _authenticateBiometrics();
+      if (!mounted) return;
+      if (success) {
+        setState(() {
+          _fingerprintEnabled = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'BIOMETRIC SCAN SUCCEEDED. FINGERPRINT ENROLLED FOR SIGN-UP.',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.black),
+            ),
+            backgroundColor: AppTheme.cyberCyan,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        setState(() {
+          _fingerprintEnabled = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'BIOMETRIC AUTHENTICATION ERROR: $e',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      setState(() {
+        _fingerprintEnabled = false;
+      });
+    }
   }
 
   @override
@@ -41,13 +153,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
-      ref.read(authProvider.notifier).signUp(
+      await ref.read(authProvider.notifier).signUp(
             _emailController.text,
             _passwordController.text,
             _nameController.text,
           );
+      
+      final nextState = ref.read(authProvider);
+      if (nextState is AuthenticatedWithoutProfile || nextState is AuthenticatedWithProfile) {
+        if (_fingerprintEnabled) {
+          try {
+            await _secureStorage.write(key: 'saved_email', value: _emailController.text);
+            await _secureStorage.write(key: 'saved_password', value: _passwordController.text);
+            await _secureStorage.write(key: 'fingerprint_enabled', value: 'true');
+          } catch (_) {}
+        } else {
+          try {
+            await _secureStorage.delete(key: 'saved_email');
+            await _secureStorage.delete(key: 'saved_password');
+            await _secureStorage.write(key: 'fingerprint_enabled', value: 'false');
+          } catch (_) {}
+        }
+      }
     }
   }
 
@@ -102,10 +231,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                   height: 450,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppTheme.cyberCyan.withOpacity(0.08 + (_pulseController.value * 0.04)),
+                    color: AppTheme.cyberCyan.withValues(alpha: 0.08 + (_pulseController.value * 0.04)),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.cyberCyan.withOpacity(0.06),
+                        color: AppTheme.cyberCyan.withValues(alpha: 0.06),
                         blurRadius: 160,
                         spreadRadius: 80,
                       )
@@ -123,10 +252,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.amethystPurple.withOpacity(0.1),
+                color: AppTheme.amethystPurple.withValues(alpha: 0.1),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.amethystPurple.withOpacity(0.08),
+                    color: AppTheme.amethystPurple.withValues(alpha: 0.08),
                     blurRadius: 180,
                     spreadRadius: 80,
                   )
@@ -278,6 +407,80 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                           return null;
                         },
                       ),
+                      if (_canCheckBiometrics) ...[
+                        const SizedBox(height: 20),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: AppTheme.darkSurface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: _fingerprintEnabled 
+                                  ? AppTheme.cyberCyan.withValues(alpha: 0.8) 
+                                  : AppTheme.cardBorderColor, 
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              if (_fingerprintEnabled)
+                                BoxShadow(
+                                  color: AppTheme.cyberCyan.withValues(alpha: 0.15),
+                                  blurRadius: 12,
+                                  spreadRadius: 1,
+                                ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  ShaderMask(
+                                    shaderCallback: (bounds) => (_fingerprintEnabled 
+                                            ? AppTheme.primaryGradient 
+                                            : const LinearGradient(colors: [Colors.white54, Colors.white54]))
+                                        .createShader(bounds),
+                                    child: Icon(
+                                      Icons.fingerprint,
+                                      color: _fingerprintEnabled ? Colors.white : Colors.white54,
+                                      size: 26,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Enable Fingerprint Quick Login',
+                                        style: GoogleFonts.outfit(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Secure, instant bio-identity setup',
+                                        style: GoogleFonts.outfit(
+                                          color: Colors.white38,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Switch(
+                                value: _fingerprintEnabled,
+                                activeThumbColor: AppTheme.cyberCyan,
+                                activeTrackColor: AppTheme.cyberCyan.withValues(alpha: 0.3),
+                                inactiveThumbColor: Colors.white30,
+                                inactiveTrackColor: Colors.black26,
+                                onChanged: _handleFingerprintToggle,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 36),
 
                       // ─── REGISTER SUBMIT CTA ─────────────────────────────
@@ -288,7 +491,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                           gradient: AppTheme.secondaryGradient,
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.amethystPurple.withOpacity(0.3),
+                              color: AppTheme.amethystPurple.withValues(alpha: 0.3),
                               blurRadius: 18,
                               offset: const Offset(0, 4),
                             ),
@@ -351,7 +554,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
           // ─── ACTION HUD LOADER ───────────────────────────────────────────
           if (authState is AuthLoading)
             Container(
-              color: Colors.black.withOpacity(0.7),
+              color: Colors.black.withValues(alpha: 0.7),
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.all(32),
@@ -361,7 +564,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                     border: Border.all(color: AppTheme.cardBorderColor, width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.amethystPurple.withOpacity(0.1),
+                        color: AppTheme.amethystPurple.withValues(alpha: 0.1),
                         blurRadius: 40,
                       )
                     ],

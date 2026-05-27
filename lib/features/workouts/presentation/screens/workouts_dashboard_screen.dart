@@ -4,9 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/routine.dart';
 import '../providers/workout_provider.dart';
+import 'active_workout_screen.dart';
 import 'routine_builder_screen.dart';
 import 'ai_planner_wizard_screen.dart';
 import 'share_import_dialog.dart';
+import 'pose_analysis_screen.dart';
 
 class WorkoutsDashboardScreen extends ConsumerStatefulWidget {
   const WorkoutsDashboardScreen({super.key});
@@ -126,6 +128,71 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                     ],
                   ),
                 ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.secondaryGradient,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.electricBlue.withOpacity(0.12),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PoseAnalysisScreen(),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.camera_enhance_outlined, color: Colors.white, size: 22),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'NEURAL POSE ANALYSIS CAMERA',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Scan active posture and check joint flexion in real-time',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.white70,
+                                        fontSize: 9,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right, color: Colors.white70, size: 16),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
 
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -148,9 +215,60 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                       child: CircularProgressIndicator(color: AppTheme.cyberCyan),
                     ),
                     error: (err, stack) => Center(
-                      child: Text(
-                        'Error loading routines: $err',
-                        style: GoogleFonts.outfit(color: Colors.redAccent),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 32),
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: AppTheme.darkSurface,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.redAccent.withOpacity(0.3), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.redAccent.withOpacity(0.05),
+                              blurRadius: 20,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
+                            const SizedBox(height: 16),
+                            Text(
+                              'ERROR LOADING ROUTINES',
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontSize: 13,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              err.toString().contains('composite index') 
+                                  ? 'Firestore requires a composite index. We have optimized collections locally to prevent this error.'
+                                  : err.toString(),
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.outfit(color: Colors.white54, fontSize: 11, height: 1.4),
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                ref.read(userRoutinesProvider.notifier).refresh();
+                              },
+                              icon: const Icon(Icons.refresh, size: 16, color: AppTheme.cyberCyan),
+                              label: Text('RETRY', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.darkBackground,
+                                foregroundColor: AppTheme.cyberCyan,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: const BorderSide(color: AppTheme.cardBorderColor),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     data: (routines) {
@@ -388,9 +506,54 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                     );
                   }),
 
+                  const SizedBox(height: 16),
+
+                  // ── START TRACKING SESSION BUTTON ─────────────────
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              ActiveWorkoutScreen(routine: routine),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.primaryGradient,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.cyberCyan.withOpacity(0.2),
+                            blurRadius: 16,
+                            spreadRadius: 1,
+                          )
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.play_arrow_rounded,
+                              color: Colors.black, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'START TRACKING SESSION',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   const Divider(color: AppTheme.cardBorderColor),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
 
                   // Actions row
                   Row(

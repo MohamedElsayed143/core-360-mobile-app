@@ -1,8 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 import '../../../../core/network/api_client.dart';
 import '../../../onboarding/presentation/providers/auth_provider.dart';
+import '../../data/models/ai_workout_models.dart';
 import '../../domain/entities/exercise.dart';
 import '../../domain/entities/routine.dart';
 import '../../domain/entities/routine_exercise.dart';
@@ -75,16 +76,76 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
     state = AiPlannerState();
   }
 
+  String _mapSplitFocus(String focus) {
+    switch (focus) {
+      case 'full_body':
+        return 'Full Body';
+      case 'upper':
+        return 'Upper Body';
+      case 'lower':
+        return 'Lower Body';
+      case 'push':
+        return 'Push Split';
+      case 'pull':
+        return 'Pull Split';
+      case 'core':
+        return 'Core & Cardio';
+      default:
+        return focus;
+    }
+  }
+
+  String _capitalize(String s) => s.isEmpty ? '' : s[0].toUpperCase() + s.substring(1);
+
+  int _parseReps(String repsStr) {
+    final match = RegExp(r'\d+').firstMatch(repsStr);
+    if (match != null) {
+      return int.tryParse(match.group(0)!) ?? 10;
+    }
+    return 10;
+  }
+
+  double _parseWeight(String weightStr) {
+    final lower = weightStr.toLowerCase();
+    if (lower.contains('bodyweight') || lower.contains('body')) {
+      return 0.0;
+    }
+    final match = RegExp(r'[\d.]+').firstMatch(weightStr);
+    if (match != null) {
+      return double.tryParse(match.group(0)!) ?? 0.0;
+    }
+    return 0.0;
+  }
+
   Future<Routine?> generateAiRoutine() async {
     final auth = ref.read(authProvider);
-    if (auth is! AuthenticatedWithProfile) {
-      state = state.copyWith(errorMessage: "User profile not loaded. Authenticate again.");
-      return null;
+    String uid;
+    String goals = 'Muscle Gain, Core Strength';
+    String experience = _capitalize(state.experienceLevel);
+    String frequency = '${state.trainingFrequency} Days';
+    String focus = _mapSplitFocus(state.splitFocus);
+    String injuries = 'None';
+
+    if (auth is AuthenticatedWithProfile) {
+      uid = auth.user.uid;
+      goals = auth.profile.goals.join(', ');
+      injuries = auth.profile.injuries ?? 'None';
+    } else if (auth is AuthenticatedWithoutProfile) {
+      uid = auth.user.uid;
+    } else {
+      // Direct Firebase Auth checkout fallback
+      final currentUser = fb.FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        uid = currentUser.uid;
+      } else {
+        state = state.copyWith(
+          isGenerating: false,
+          errorMessage: "Authentication failed. Please sign in.",
+        );
+        return null;
+      }
     }
 
-    final user = auth.user;
-    final profile = auth.profile;
-    
     // Fetch global seeded workouts
     final globalWorkoutsAsync = ref.read(globalWorkoutsProvider);
     final globalWorkouts = globalWorkoutsAsync.value ?? [];
@@ -94,123 +155,70 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
     try {
       final apiClient = ref.read(apiClientProvider);
 
-      // Construct workouts summary for the LLM
-      final workoutSummaryBuffer = StringBuffer();
-      for (final w in globalWorkouts) {
-        workoutSummaryBuffer.writeln(
-          "- ID: ${w.id}, Title: ${w.title}, Target Muscle: ${w.targetMuscle}, Description: ${w.description}"
-        );
-      }
-
-      final systemPrompt = '''
-You are a highly professional, expert AI personal trainer and biomechanical safety coordinator for the "Core-360" fitness application.
-Your objective is to compile a highly customized, safe, and effective workout routine tailored to the user's biometrics, experience, split focus, and injury restrictions.
-
-Strict Safety Rules:
-1. You MUST check the user's "Pre-Existing Injuries". If they have specified any injury (e.g. lower back pain, shoulder pain, knee issues), you MUST NOT prescribe any exercise that targets, stresses, or loads that joint or muscle group.
-2. Select exercises ONLY from the provided global library of available workouts. Do NOT invent new workout IDs or titles.
-3. Calculate sets, reps, and default weight in kilograms (kg) based on their body weight, goals, and experience level:
-   - For bodyweight exercises (e.g. Squat squats_003, Push-Up push_ups_002, Plank plank_005, Pull-Up pull_ups_004, Leg Raise leg_raises_012), the default weight (kg) MUST be 0.0.
-   - For weighted barbell/dumbbell exercises (e.g. Bench Press bench_press_001, Curls bicep_curl_006, Overhead Press overhead_press_008, Romanian Deadlift romanian_deadlift_009), estimate a safe, realistic starter weight for their experience level and weight.
-   - Prescribe between 3 to 5 exercises in the routine.
-
-You must output a raw JSON object matching this schema, with no markdown code fences or extra text, just the raw JSON:
-{
-  "name": "A short, premium-sounding, motivational routine name (e.g., 'Obsidian Chest Sculpt' or 'Core-360 Leg Developer')",
-  "exercises": [
-    {
-      "workoutId": "id of the exercise from the list",
-      "sets": [
-        {
-          "reps": integer,
-          "kg": double
-        }
-      ]
-    }
-  ]
-}
-''';
-
-      final userPrompt = '''
-User Biometrics & Profile:
-- Age: ${profile.age}
-- Height: ${profile.height} cm
-- Weight: ${profile.weight} kg
-- Fitness Goals: ${profile.goals.join(', ')}
-- Pre-Existing Injuries: ${profile.injuries ?? 'None'}
-
-Routine Parameters:
-- Experience Level: ${state.experienceLevel}
-- Training Frequency: ${state.trainingFrequency} days/week
-- Workout Split Focus: ${state.splitFocus}
-
-Available Workouts Library:
-$workoutSummaryBuffer
-''';
-
-      final response = await apiClient.getChatCompletion(
-        systemPrompt: systemPrompt,
-        userPrompt: userPrompt,
+      // Map survey configuration to the API payload
+      final request = AiWorkoutRequest(
+        goal: goals,
+        experience: experience,
+        frequency: frequency,
+        focus: focus,
+        injuries: injuries,
+        availableExercises: globalWorkouts.map((w) => w.title).toList(),
       );
 
-      final choice = response['choices']?[0];
-      final content = choice?['message']?['content'] as String? ?? '';
-      
-      // Clean content if model wrapped in markdown blocks
-      var jsonStr = content.trim();
-      if (jsonStr.startsWith('```json')) {
-        jsonStr = jsonStr.substring(7);
-      }
-      if (jsonStr.endsWith('```')) {
-        jsonStr = jsonStr.substring(0, jsonStr.length - 3);
-      }
-      jsonStr = jsonStr.trim();
-
-      final parsed = jsonDecode(jsonStr) as Map<String, dynamic>;
-      final routineName = parsed['name'] as String? ?? 'AI Generated Workout';
-      final jsonExercises = parsed['exercises'] as List? ?? [];
+      // Perform API call to local/hosted Next.js backend
+      final apiResponse = await apiClient.generateAiWorkout(request);
+      final routineData = apiResponse.routine;
 
       final List<RoutineExercise> exercises = [];
-      for (int i = 0; i < jsonExercises.length; i++) {
-        final exMap = Map<String, dynamic>.from(jsonExercises[i] as Map);
-        final workoutId = exMap['workoutId'] as String? ?? '';
+      for (int i = 0; i < routineData.exercises.length; i++) {
+        final apiEx = routineData.exercises[i];
         
         // Find corresponding exercise in globalWorkouts
-        final globalWorkout = globalWorkouts.firstWhere(
-          (w) => w.id == workoutId,
-          orElse: () => Exercise(
-            id: workoutId,
-            title: exMap['title'] as String? ?? 'Exercise',
-            description: '',
-            targetMuscle: exMap['targetMuscle'] as String? ?? 'chest',
-            thumbnailUrl: '',
-            videoUrl: '',
-            aiSupported: false,
+        final matchedExercise = globalWorkouts.firstWhere(
+          (w) => w.title.toLowerCase().trim() == apiEx.name.toLowerCase().trim(),
+          orElse: () {
+            // Fallback substring matching
+            return globalWorkouts.firstWhere(
+              (w) => w.title.toLowerCase().contains(apiEx.name.toLowerCase()) ||
+                     apiEx.name.toLowerCase().contains(w.title.toLowerCase()),
+              orElse: () => Exercise(
+                id: 'dynamic_${apiEx.name.toLowerCase().replaceAll(' ', '_')}',
+                title: apiEx.name,
+                description: apiEx.notes,
+                targetMuscle: state.splitFocus == 'lower' ? 'legs' : 'chest',
+                thumbnailUrl: '',
+                videoUrl: ApiClient.resolveWorkoutVideoUrl(apiEx.name),
+                aiSupported: false,
+              ),
+            );
+          },
+        );
+
+        // Safely parse reps and weight strings into Config List
+        final parsedReps = _parseReps(apiEx.reps);
+        final parsedWeight = _parseWeight(apiEx.weightKg);
+
+        final setsList = List.generate(
+          apiEx.sets > 0 ? apiEx.sets : 3,
+          (_) => SetConfig(
+            reps: parsedReps,
+            weight: parsedWeight,
           ),
         );
 
-        final jsonSets = exMap['sets'] as List? ?? [];
-        final sets = jsonSets.map((s) {
-          final sMap = Map<String, dynamic>.from(s as Map);
-          return SetConfig(
-            reps: sMap['reps'] as int? ?? 10,
-            weight: (sMap['kg'] as num? ?? 0.0).toDouble(),
-          );
-        }).toList();
-
         exercises.add(RoutineExercise(
-          workoutId: globalWorkout.id,
-          title: globalWorkout.title,
-          targetMuscle: globalWorkout.targetMuscle,
-          sets: sets,
+          workoutId: matchedExercise.id,
+          title: matchedExercise.title,
+          targetMuscle: matchedExercise.targetMuscle,
+          sets: setsList,
           order: i,
         ));
       }
 
       final generatedRoutine = Routine(
         id: '',
-        userId: user.uid,
-        name: routineName,
+        userId: uid,
+        name: routineData.routineName,
         exercises: exercises,
         isAiGenerated: true,
         createdAt: DateTime.now(),
@@ -224,7 +232,10 @@ $workoutSummaryBuffer
       return generatedRoutine;
     } catch (e, stack) {
       debugPrint('Error generating routine: $e\n$stack');
-      state = state.copyWith(isGenerating: false, errorMessage: 'Failed to generate AI routine: $e');
+      state = state.copyWith(
+        isGenerating: false, 
+        errorMessage: 'Failed to generate AI routine from Next.js server: $e',
+      );
       return null;
     }
   }

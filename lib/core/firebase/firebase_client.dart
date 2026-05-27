@@ -73,3 +73,16 @@ final firebaseClientProvider = Provider<FirebaseClient>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return FirebaseClient(auth: auth, firestore: firestore);
 });
+
+/// Notifier to bypass Firebase calibration checks for offline simulated test runs.
+/// Uses Riverpod 3.x [Notifier] pattern (StateProvider was removed in v3).
+class FirebaseBypassNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool value) => state = value;
+  void toggle() => state = !state;
+}
+
+final firebaseBypassProvider =
+    NotifierProvider<FirebaseBypassNotifier, bool>(FirebaseBypassNotifier.new);

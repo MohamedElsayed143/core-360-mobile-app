@@ -19,25 +19,25 @@
 - [x] Share Code Generation & Importing Logic (8-character alphanumeric Firestore lookup)
 
 ### 3. Active Workout Tracking Session
-- [ ] Active Stopwatch HUD (MM:SS timer)
-- [ ] YouTube Tutorial Video Player Integration (`youtube_player_flutter`)
-- [ ] Interactive Sets Ledger UI (Add/Delete/Log Sets, Reps, and KG in Firestore)
-- [ ] Post-Workout Trophy Summary Card & Session Saving
+- [x] Active Stopwatch HUD (MM:SS timer)
+- [x] YouTube Tutorial Video Player Integration (`youtube_player_flutter`)
+- [x] Interactive Sets Ledger UI (Add/Delete/Log Sets, Reps, and KG in Firestore)
+- [x] Post-Workout Trophy Summary Card & Session Saving
 
 ### 4. Neural Pose Analysis Engine (Computer Vision)
-- [ ] Camera Interface for Live Frame Capture
-- [ ] Google ML Kit Pose Detection SDK integration & Landmarking Bridge
-- [ ] Geometric Biomechanics Score Logic (0-100%) & Live HUD Warning Strip
-- [ ] AI Biomechanics Report layout & Firestore saving of Analysis Results
+- [x] Camera Interface for Live Frame Capture
+- [x] Google ML Kit Pose Detection SDK integration & Landmarking Bridge
+- [x] Geometric Biomechanics Score Logic (0-100%) & Live HUD Warning Strip
+- [x] AI Biomechanics Report layout & Firestore saving of Analysis Results
 
 ### 5. Bilingual RAG AI Coach Chat
-- [ ] Chat UI Interface (User and Assistant Message Bubbles)
-- [ ] RAG Payload Compiler (Fetches Firestore User Profile + History to send to API)
-- [ ] Streaming response support with Groq Cloud Endpoint
-- [ ] `[PLAN_PROPOSAL]` JSON parser to render clickable cards inside chat
+- [x] Chat UI Interface (User and Assistant Message Bubbles)
+- [x] RAG Payload Compiler (Fetches Firestore User Profile + History to send to API)
+- [x] Streaming response support with Groq Cloud Endpoint
+- [x] `[PLAN_PROPOSAL]` JSON parser to render clickable cards inside chat
 
 ### 6. Interactive Analytics & Progress Dashboard
-- [ ] 7-Day / 30-Day Time Window Selector Toggle
-- [ ] 4 Analytical KPI Blocks UI (Sourced from Firestore)
-- [ ] Area & Bar Charts Integration using `fl_chart`
-- [ ] Anatomical Muscle Highlighter Matrix (Front/Back Interactive View & trained counts)
+- [x] 7-Day / 30-Day Time Window Selector Toggle
+- [x] 4 Analytical KPI Blocks UI (Sourced from Firestore)
+- [x] Area & Bar Charts Integration using `fl_chart`
+- [x] Anatomical Muscle Highlighter Matrix (Front/Back Interactive View & trained counts)

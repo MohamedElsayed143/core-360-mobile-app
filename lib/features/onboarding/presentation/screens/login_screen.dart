@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:core_360_app/core/theme/app_theme.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../providers/auth_provider.dart';
 import 'register_screen.dart';
 
@@ -19,6 +21,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
   bool _obscurePassword = true;
   late AnimationController _pulseController;
 
+  final LocalAuthentication _localAuth = LocalAuthentication();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  bool _fingerprintEnabled = false;
+
   @override
   void initState() {
     super.initState();
@@ -26,6 +32,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat(reverse: true);
+    _checkBiometrics();
   }
 
   @override
@@ -36,12 +43,74 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     super.dispose();
   }
 
+  Future<void> _checkBiometrics() async {
+    try {
+      final savedEnabled = await _secureStorage.read(key: 'fingerprint_enabled');
+      final email = await _secureStorage.read(key: 'saved_email');
+      final password = await _secureStorage.read(key: 'saved_password');
+      if (savedEnabled == 'true' && email != null && password != null) {
+        setState(() {
+          _fingerprintEnabled = true;
+        });
+      } else {
+        setState(() {
+          _fingerprintEnabled = false;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _authenticateWithBiometrics() async {
+    final enabled = await _secureStorage.read(key: 'fingerprint_enabled');
+    final email = await _secureStorage.read(key: 'saved_email');
+    final password = await _secureStorage.read(key: 'saved_password');
+    if (!mounted) return;
+    if (enabled != 'true' || email == null || password == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'BIOMETRICS NOT CONFIGURED. PLEASE SIGN IN MANUALLY.',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: AppTheme.amethystPurple,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final authenticated = await _localAuth.authenticate(
+        localizedReason: 'Scan fingerprint to authenticate secure access to Core-360',
+        options: const AuthenticationOptions(
+          biometricOnly: true,
+          stickyAuth: true,
+        ),
+      );
+
+      if (authenticated) {
+        ref.read(authProvider.notifier).signIn(email, password);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'BIOMETRIC AUTHENTICATION FAILED: $e',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   void _submit() {
     if (_formKey.currentState!.validate()) {
-      ref.read(authProvider.notifier).signIn(
-            _emailController.text,
-            _passwordController.text,
-          );
+      final email = _emailController.text;
+      final password = _passwordController.text;
+      ref.read(authProvider.notifier).signIn(email, password);
     }
   }
 
@@ -96,10 +165,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                   height: 450,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppTheme.amethystPurple.withOpacity(0.12 + (_pulseController.value * 0.05)),
+                    color: AppTheme.amethystPurple.withValues(alpha: 0.12 + (_pulseController.value * 0.05)),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.amethystPurple.withOpacity(0.08),
+                        color: AppTheme.amethystPurple.withValues(alpha: 0.08),
                         blurRadius: 150,
                         spreadRadius: 80,
                       )
@@ -117,10 +186,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.cyberCyan.withOpacity(0.08),
+                color: AppTheme.cyberCyan.withValues(alpha: 0.08),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.cyberCyan.withOpacity(0.06),
+                    color: AppTheme.cyberCyan.withValues(alpha: 0.06),
                     blurRadius: 180,
                     spreadRadius: 80,
                   )
@@ -153,7 +222,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                             border: Border.all(color: AppTheme.cardBorderColor, width: 1.5),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.cyberCyan.withOpacity(0.12),
+                                color: AppTheme.cyberCyan.withValues(alpha: 0.12),
                                 blurRadius: 30,
                                 spreadRadius: 2,
                               )
@@ -249,41 +318,87 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                           return null;
                         },
                       ),
-                      const SizedBox(height: 36),
+                      const SizedBox(height: 24),
 
-                      // ─── LOGIN SUBMIT CTA ────────────────────────────────
-                      Container(
-                        height: 56,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          gradient: AppTheme.primaryGradient,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.cyberCyan.withOpacity(0.3),
-                              blurRadius: 18,
-                              offset: const Offset(0, 4),
+                      // ─── LOGIN SUBMIT CTA & FACE ID ROW ────────────────────────────────
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 56,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                gradient: AppTheme.primaryGradient,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.cyberCyan.withValues(alpha: 0.3),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: authState is AuthLoading ? null : _submit,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                child: Text(
+                                  'SIGN IN',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (_fingerprintEnabled) ...[
+                            const SizedBox(width: 12),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: AppTheme.darkSurface,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: AppTheme.cyberCyan.withValues(alpha: 0.8),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.cyberCyan.withValues(alpha: 0.35),
+                                    blurRadius: 16,
+                                    spreadRadius: 1,
+                                  ),
+                                  BoxShadow(
+                                    color: AppTheme.amethystPurple.withValues(alpha: 0.2),
+                                    blurRadius: 8,
+                                    spreadRadius: -2,
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                icon: ShaderMask(
+                                  shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
+                                  child: const Icon(
+                                    Icons.fingerprint,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
+                                ),
+                                tooltip: 'Biometric Fingerprint Quick Sign In',
+                                onPressed: authState is AuthLoading ? null : _authenticateWithBiometrics,
+                              ),
                             ),
                           ],
-                        ),
-                        child: ElevatedButton(
-                          onPressed: authState is AuthLoading ? null : _submit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: Text(
-                            'SIGN IN',
-                            style: GoogleFonts.outfit(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
+                        ],
                       ),
                       const SizedBox(height: 24),
 
@@ -300,8 +415,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                               Navigator.push(
                                 context,
                                 PageRouteBuilder(
-                                  pageBuilder: (_, __, ___) => const RegisterScreen(),
-                                  transitionsBuilder: (_, animation, __, child) {
+                                  pageBuilder: (context, animation, secondaryAnimation) => const RegisterScreen(),
+                                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
                                     return FadeTransition(
                                       opacity: animation,
                                       child: child,
@@ -333,7 +448,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
           // ─── GLASSMORPHIC ACTION HUD LOADER ──────────────────────────────
           if (authState is AuthLoading)
             Container(
-              color: Colors.black.withOpacity(0.7),
+              color: Colors.black.withValues(alpha: 0.7),
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.all(32),
@@ -343,7 +458,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                     border: Border.all(color: AppTheme.cardBorderColor, width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.cyberCyan.withOpacity(0.1),
+                        color: AppTheme.cyberCyan.withValues(alpha: 0.1),
                         blurRadius: 40,
                       )
                     ],

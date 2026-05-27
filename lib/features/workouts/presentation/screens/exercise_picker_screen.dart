@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../domain/entities/exercise.dart';
 import '../providers/workout_provider.dart';
 
 class ExercisePickerScreen extends ConsumerStatefulWidget {
@@ -13,6 +14,138 @@ class ExercisePickerScreen extends ConsumerStatefulWidget {
 
 class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
   String _searchQuery = '';
+
+  void _showCreateCustomExerciseDialog() {
+    final nameController = TextEditingController();
+    String targetMuscle = 'arms';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: AppTheme.darkSurface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: AppTheme.cardBorderColor),
+            ),
+            title: Text(
+              'CREATE CUSTOM EXERCISE',
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                fontSize: 16,
+                letterSpacing: 0.5,
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Add a custom custom-tailored exercise to your routine database.',
+                    style: GoogleFonts.outfit(color: Colors.white54, fontSize: 11),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Exercise Name Input
+                  TextField(
+                    controller: nameController,
+                    style: GoogleFonts.outfit(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'EXERCISE TITLE',
+                      hintText: 'E.G., INCLINE HAMMER CURLS',
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  
+                  // Target Muscle Dropdown
+                  Text(
+                    'TARGET MUSCLE',
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white30,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkBackground,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.cardBorderColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: targetMuscle,
+                        dropdownColor: AppTheme.darkSurface,
+                        style: GoogleFonts.outfit(color: Colors.white),
+                        icon: const Icon(Icons.arrow_drop_down, color: AppTheme.cyberCyan),
+                        isExpanded: true,
+                        items: ['chest', 'back', 'legs', 'arms', 'abs', 'shoulders']
+                            .map((m) => DropdownMenuItem(
+                                  value: m,
+                                  child: Text(m.toUpperCase()),
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() {
+                              targetMuscle = val;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                child: Text(
+                  'CANCEL',
+                  style: GoogleFonts.outfit(color: Colors.white30, fontWeight: FontWeight.bold),
+                ),
+                onPressed: () => Navigator.pop(dialogContext),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.cyberCyan,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: Text(
+                  'CREATE',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () {
+                  final title = nameController.text.trim();
+                  if (title.isEmpty) return;
+                  
+                  final customExercise = Exercise(
+                    id: 'custom_${title.toLowerCase().replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}',
+                    title: title,
+                    description: 'Custom empty exercise registered in personal database.',
+                    targetMuscle: targetMuscle,
+                    thumbnailUrl: '',
+                    videoUrl: '',
+                    aiSupported: false,
+                  );
+                  
+                  Navigator.pop(dialogContext); // pop dialog
+                  Navigator.pop(context, customExercise); // pop picker screen returning exercise
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +209,45 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                   ),
                 ),
               ),
+
+              // + CREATE CUSTOM EXERCISE BUTTON
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 4.0),
+                child: GestureDetector(
+                  onTap: _showCreateCustomExerciseDialog,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkSurface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.amethystPurple.withOpacity(0.4), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.amethystPurple.withOpacity(0.05),
+                          blurRadius: 8,
+                        )
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.add, color: AppTheme.amethystPurple, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          "CAN'T FIND AN EXERCISE? CREATE CUSTOM",
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.amethystPurple,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
 
               // Filtered list
               Expanded(

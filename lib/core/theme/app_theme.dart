@@ -40,7 +40,9 @@ class AppTheme {
         primary: cyberCyan,
         secondary: amethystPurple,
         surface: darkSurface,
-        background: darkBackground,
+        // background is deprecated in Material 3; use scaffoldBackgroundColor at the
+        // ThemeData level (already set above) and surfaceContainerLowest for dialogs.
+        surfaceContainerLowest: darkBackground,
         error: Colors.redAccent,
         onPrimary: Colors.black,
         onSecondary: Colors.white,
@@ -57,7 +59,7 @@ class AppTheme {
           letterSpacing: 0.2,
         ),
         bodyLarge: GoogleFonts.outfit(
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.white.withValues(alpha: 0.9),
           fontWeight: FontWeight.normal,
         ),
       ),

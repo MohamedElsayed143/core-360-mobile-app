@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/routine.dart';
 import '../providers/workout_provider.dart';
@@ -9,6 +10,8 @@ import 'routine_builder_screen.dart';
 import 'ai_planner_wizard_screen.dart';
 import 'share_import_dialog.dart';
 import 'pose_analysis_screen.dart';
+import '../../domain/entities/exercise.dart';
+import '../widgets/exercise_gif_widget.dart';
 
 class WorkoutsDashboardScreen extends ConsumerStatefulWidget {
   const WorkoutsDashboardScreen({super.key});
@@ -19,6 +22,23 @@ class WorkoutsDashboardScreen extends ConsumerStatefulWidget {
 
 class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScreen> {
   String? _expandedRoutineId;
+
+  Future<void> _launchVideo(String urlString) async {
+    if (urlString.isEmpty) return;
+    final Uri url = Uri.parse(urlString);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open video URL: $urlString'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 
   void _toggleExpand(String id) {
     setState(() {
@@ -33,6 +53,7 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
   @override
   Widget build(BuildContext context) {
     final routinesAsync = ref.watch(userRoutinesProvider);
+    final workoutsAsync = ref.watch(globalWorkoutsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -283,7 +304,7 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                         itemBuilder: (context, index) {
                           final routine = routines[index];
                           final isExpanded = _expandedRoutineId == routine.id;
-                          return _buildRoutineCard(context, routine, isExpanded);
+                          return _buildRoutineCard(context, routine, isExpanded, workoutsAsync.value);
                         },
                       );
                     },
@@ -388,7 +409,7 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
     );
   }
 
-  Widget _buildRoutineCard(BuildContext context, Routine routine, bool isExpanded) {
+  Widget _buildRoutineCard(BuildContext context, Routine routine, bool isExpanded, List<Exercise>? globalExercises) {
     final borderColor = routine.isAiGenerated ? AppTheme.amethystPurple : AppTheme.cyberCyan;
     
     return Container(
@@ -479,32 +500,99 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   ...routine.exercises.map((ex) {
+                    final matchingExercise = globalExercises?.firstWhere(
+                      (e) => e.id == ex.workoutId || e.title.toLowerCase().trim() == ex.title.toLowerCase().trim(),
+                      orElse: () => Exercise(
+                        id: '',
+                        title: ex.title,
+                        description: '',
+                        targetMuscle: ex.targetMuscle,
+                        thumbnailUrl: '',
+                        videoUrl: '',
+                        gifUrl: '',
+                        aiSupported: false,
+                      ),
+                    );
+                    final gifUrl = matchingExercise?.gifUrl ?? '';
+                    final thumbnailUrl = matchingExercise?.thumbnailUrl ?? '';
+                    final videoUrl = matchingExercise?.videoUrl ?? '';
+
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 10.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              ex.title,
-                              style: GoogleFonts.outfit(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white.withOpacity(0.9),
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: InkWell(
+                        onTap: videoUrl.isNotEmpty ? () => _launchVideo(videoUrl) : null,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Row(
+                          children: [
+                            ExerciseGifWidget(
+                              gifUrl: gifUrl,
+                              thumbnailUrl: thumbnailUrl,
+                              width: 40,
+                              height: 40,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          ex.title,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white.withOpacity(0.9),
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (videoUrl.isNotEmpty) ...[
+                                        const SizedBox(width: 6),
+                                        const Icon(
+                                          Icons.play_circle_outline,
+                                          color: AppTheme.cyberCyan,
+                                          size: 14,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    ex.targetMuscle.toUpperCase(),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 9,
+                                      color: AppTheme.cyberCyan.withOpacity(0.8),
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          Text(
-                            '${ex.sets.length} Sets',
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              color: Colors.white54,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.glassFillColor,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppTheme.cardBorderColor),
+                            ),
+                            child: Text(
+                              '${ex.sets.length} SETS',
+                              style: GoogleFonts.outfit(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white70,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    );
-                  }),
+                    ),
+                  );
+                }),
 
                   const SizedBox(height: 16),
 

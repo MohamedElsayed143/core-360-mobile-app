@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import '../../core/network/models/workout_data.dart';
 import 'api_constants.dart';
 import '../../features/workouts/data/models/ai_workout_models.dart';
 import '../../features/chat/data/models/chat_message_model.dart';
@@ -10,6 +12,10 @@ import 'dart:developer' as developer;
 
 class ApiClient {
   final Dio _dio;
+
+  // Cache for workouts fetched from backend
+  Map<String, WorkoutData>? _workoutsCache;
+  bool _isFetchingWorkouts = false;
 
   ApiClient({Dio? dio}) : _dio = dio ?? Dio() {
     _dio.options.baseUrl = ApiConstants.baseUrl;
@@ -23,10 +29,9 @@ class ApiClient {
           try {
             final user = fb.FirebaseAuth.instance.currentUser;
             if (user != null) {
-              final token = await user.getIdToken(false).timeout(
-                const Duration(seconds: 3),
-                onTimeout: () => null,
-              );
+              final token = await user
+                  .getIdToken(false)
+                  .timeout(const Duration(seconds: 3), onTimeout: () => null);
               if (token != null && token.trim().isNotEmpty) {
                 options.headers['Authorization'] = 'Bearer ${token.trim()}';
               }
@@ -40,6 +45,162 @@ class ApiClient {
     );
   }
 
+  /// Fetch all workouts from backend (to be used for video URL resolution)
+  Future<Map<String, WorkoutData>> _fetchWorkoutsLibrary() async {
+    if (_workoutsCache != null) return _workoutsCache!;
+    if (_isFetchingWorkouts) {
+      // Wait for ongoing fetch
+      await Future.delayed(const Duration(milliseconds: 200));
+      return _workoutsCache ?? {};
+    }
+    _isFetchingWorkouts = true;
+    try {
+      final response = await _dio.get(ApiConstants.workouts);
+      if (response.statusCode == 200 && response.data is List) {
+        final List<dynamic> list = response.data;
+        final Map<String, WorkoutData> cache = {};
+        for (var item in list) {
+          final title = item['title'] as String?;
+          if (title != null) {
+            cache[title.toLowerCase()] = WorkoutData(
+              title: title,
+              videoUrl: item['videoUrl'] as String?,
+              description: item['description'] as String?,
+              targetMuscle: item['targetMuscle'] as String?,
+            );
+          }
+        }
+        _workoutsCache = cache;
+        debugPrint('✅ Loaded ${cache.length} workouts into cache');
+        return cache;
+      } else {
+        debugPrint('⚠️ Failed to fetch workouts: ${response.statusCode}');
+        return {};
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error fetching workouts: $e');
+      return {};
+    } finally {
+      _isFetchingWorkouts = false;
+    }
+  }
+
+  /// Get video URL for a given exercise title (from backend cache or fallback)
+  Future<String> getWorkoutVideoUrl(String title) async {
+    try {
+      final String jsonContent = await rootBundle.loadString('assets/workouts.json');
+      final List<dynamic> jsonList = jsonDecode(jsonContent) as List<dynamic>;
+      final key = title.toLowerCase().trim();
+      for (var item in jsonList) {
+        final itemTitle = (item['title'] as String?)?.toLowerCase().trim();
+        if (itemTitle == key) {
+          return item['videoUrl'] as String? ?? '';
+        }
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  /// Get dynamic animated exercise GIF URL (interfaces with ExerciseDB API or falls back to robust direct GIF links)
+  Future<String> getWorkoutGifUrl(String title) async {
+    final sanitizedTitle = title.trim().toLowerCase();
+    if (sanitizedTitle.isEmpty) return '';
+
+    // 0. Try to load from assets/workouts.json first where we mapped high-performance Cloudfront URLs
+    String videoUrl = '';
+    try {
+      final String jsonContent = await rootBundle.loadString('assets/workouts.json');
+      final List<dynamic> jsonList = jsonDecode(jsonContent) as List<dynamic>;
+      for (var item in jsonList) {
+        final itemTitle = (item['title'] as String?)?.toLowerCase().trim();
+        if (itemTitle == sanitizedTitle) {
+          final gifUrl = item['gifUrl'] as String?;
+          if (gifUrl != null && gifUrl.isNotEmpty) {
+            return gifUrl;
+          }
+          videoUrl = item['videoUrl'] as String? ?? '';
+        }
+      }
+    } catch (_) {}
+
+    // 1. Try to fetch from ExerciseDB API via RapidAPI if a key is provided
+    final apiKey = const String.fromEnvironment('RAPIDAPI_KEY');
+    if (apiKey.isNotEmpty && apiKey != 'MOCK_KEY') {
+      try {
+        final encodedName = Uri.encodeComponent(sanitizedTitle);
+        final response = await _dio.get(
+          'https://exercisedb.p.rapidapi.com/exercises/name/$encodedName',
+          options: Options(
+            headers: {
+              'x-rapidapi-key': apiKey,
+              'x-rapidapi-host': 'exercisedb.p.rapidapi.com',
+            },
+          ),
+        );
+        if (response.statusCode == 200 && response.data is List && (response.data as List).isNotEmpty) {
+          final first = response.data[0];
+          final gifUrl = first['gifUrl'] as String?;
+          if (gifUrl != null && gifUrl.isNotEmpty) {
+            debugPrint('✅ Resolved $title GIF via ExerciseDB API: $gifUrl');
+            return gifUrl;
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ ExerciseDB API fetch failed for $title: $e. Falling back to dynamic links...');
+      }
+    }
+
+    // 2. Try converting videoUrl to YouTube WebP/GIF stream
+    if (videoUrl.isNotEmpty) {
+      try {
+        final uri = Uri.tryParse(videoUrl);
+        if (uri != null) {
+          String? videoId;
+          if (videoUrl.contains('youtu.be/')) {
+            videoId = videoUrl.split('youtu.be/').last.split('?').first;
+          } else if (videoUrl.contains('v=')) {
+            videoId = uri.queryParameters['v'];
+          } else if (videoUrl.contains('shorts/')) {
+            videoId = videoUrl.split('shorts/').last.split('?').first;
+          } else if (videoUrl.contains('embed/')) {
+            videoId = videoUrl.split('embed/').last.split('?').first;
+          }
+
+          if (videoId != null && videoId.isNotEmpty) {
+            return 'https://i.ytimg.com/an_webp/$videoId/mqdefault_6s.webp';
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. High-fidelity Dynamic direct GIF link fallback (GitHub free-exercise-db format)
+    final formattedName = sanitizedTitle
+        .replaceAll(RegExp(r'[^a-z0-9\s-]'), '')
+        .replaceAll(RegExp(r'\s+'), '-');
+
+    final customMapping = {
+      'barbell bench press': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3hpeDRuM3V4M3V4M3V4M3V4M3V4M3V4M3V4M3V4M3V4M3V4/3o7TKo7MuTj6yGjZy8/giphy.gif',
+      'push-ups': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3hpeDRuM3V4M3V4M3V4M3V4M3V4M3V4M3V4M3V4M3V4M3V4/3o7TKo7MuTj6yGjZy8/giphy.gif',
+      'bodyweight squat': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3hpeDRuM3V4M3V4M3V4M3V4M3V4M3V4M3V4M3V4M3V4M3V4/3o7TKo7MuTj6yGjZy8/giphy.gif',
+    };
+
+    if (customMapping.containsKey(sanitizedTitle)) {
+      return customMapping[sanitizedTitle]!;
+    }
+
+    return 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/$formattedName/images/0.gif';
+  }
+
+  /// Helper to get full workout object by title
+  Future<WorkoutData?> getWorkoutByTitle(String title) async {
+    final workouts = await _fetchWorkoutsLibrary();
+    final key = title.toLowerCase();
+    if (workouts.containsKey(key)) {
+      return workouts[key];
+    }
+    return null;
+  }
+
   /// Personalized AI Workout Planner (POST /api/ai-workout)
   Future<AiWorkoutResponse> generateAiWorkout(AiWorkoutRequest request) async {
     try {
@@ -49,7 +210,9 @@ class ApiClient {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        return AiWorkoutResponse.fromJson(response.data as Map<String, dynamic>);
+        return AiWorkoutResponse.fromJson(
+          response.data as Map<String, dynamic>,
+        );
       } else {
         throw DioException(
           requestOptions: response.requestOptions,
@@ -71,20 +234,32 @@ class ApiClient {
           error: e,
         );
       }
-      debugPrint('Error generating workout: $e. Falling back to local AI simulator.');
+      debugPrint(
+        'Error generating workout: $e. Falling back to local AI simulator.',
+      );
       return _generateSimulatedWorkoutResponse(request);
     }
   }
 
   /// Bilingual RAG AI Coach Chat Stream (POST /api/chat)
-  Stream<String> streamChat(List<ChatMessageModel> messages) async* {
+  Stream<String> streamChat(
+    List<ChatMessageModel> messages, {
+    Map<String, dynamic>? healthMetrics,
+    Map<String, dynamic>? activeSessionLogs,
+  }) async* {
     final payload = {
-      'messages': messages.map((m) => {
-        'role': m.role,
-        'content': m.planProposal != null 
-            ? '${m.content}\n[PLAN_PROPOSAL]\n${jsonEncode(m.planProposal!.toJson())}\n[/PLAN_PROPOSAL]'
-            : m.content,
-      }).toList(),
+      'messages': messages
+          .map(
+            (m) => {
+              'role': m.role,
+              'content': m.planProposal != null
+                  ? '${m.content}\n[PLAN_PROPOSAL]\n${jsonEncode(m.planProposal!.toJson())}\n[/PLAN_PROPOSAL]'
+                  : m.content,
+            },
+          )
+          .toList(),
+      if (healthMetrics != null) 'healthMetrics': healthMetrics,
+      if (activeSessionLogs != null) 'activeSessionLogs': activeSessionLogs,
     };
 
     bool yieldedAny = false;
@@ -117,9 +292,10 @@ class ApiClient {
           try {
             final decoded = jsonDecode(data);
             if (decoded is Map) {
-              final content = decoded['content'] ?? 
-                              decoded['choices']?[0]?['delta']?['content'] ?? 
-                              '';
+              final content =
+                  decoded['content'] ??
+                  decoded['choices']?[0]?['delta']?['content'] ??
+                  '';
               if (content.toString().isNotEmpty) {
                 yieldedAny = true;
                 yield content.toString();
@@ -135,7 +311,9 @@ class ApiClient {
         } else if (line.isNotEmpty) {
           if (line.startsWith('0:')) {
             final content = line.substring(2).trim();
-            if (content.startsWith('"') && content.endsWith('"') && content.length > 1) {
+            if (content.startsWith('"') &&
+                content.endsWith('"') &&
+                content.length > 1) {
               try {
                 final unescaped = jsonDecode(content) as String;
                 yieldedAny = true;
@@ -156,8 +334,14 @@ class ApiClient {
       }
 
       if (!yieldedAny) {
-        debugPrint('Backend chat stream returned empty. Falling back to local RAG AI Coach.');
-        yield* streamSimulatedChatResponse(messages);
+        debugPrint(
+          'Backend chat stream returned empty. Falling back to local RAG AI Coach.',
+        );
+        yield* streamSimulatedChatResponse(
+          messages,
+          healthMetrics: healthMetrics,
+          activeSessionLogs: activeSessionLogs,
+        );
       }
     } catch (e) {
       if (e is DioException) {
@@ -167,65 +351,53 @@ class ApiClient {
           error: e,
         );
       } else {
-        developer.log(
-          'Error streaming chat: $e',
-          name: 'ApiClient',
-          error: e,
-        );
+        developer.log('Error streaming chat: $e', name: 'ApiClient', error: e);
       }
-      debugPrint('Error streaming chat: $e. Falling back to local RAG AI Coach.');
-      yield* streamSimulatedChatResponse(messages);
+      debugPrint(
+        'Error streaming chat: $e. Falling back to local RAG AI Coach.',
+      );
+      yield* streamSimulatedChatResponse(
+        messages,
+        healthMetrics: healthMetrics,
+        activeSessionLogs: activeSessionLogs,
+      );
     }
   }
 
-  /// Global Dynamic YouTube Video Tutorial Resolver for Sandbox & Fallback imports
-  static String resolveWorkoutVideoUrl(String title) {
-    final lower = title.toLowerCase();
-    if (lower.contains('bench press')) {
-      return 'https://www.youtube.com/watch?v=rT7DgCr-3pg';
-    } else if (lower.contains('push-up') || lower.contains('push up')) {
-      return 'https://www.youtube.com/watch?v=IODxDxX7oi4';
-    } else if (lower.contains('tricep extension') || lower.contains('tricep')) {
-      return 'https://www.youtube.com/watch?v=X-iV-sGEL1s';
-    } else if (lower.contains('squat')) {
-      return 'https://www.youtube.com/watch?v=aclHkVaku9U';
-    } else if (lower.contains('calf raise') || lower.contains('calf')) {
-      return 'https://www.youtube.com/watch?v=YM21oT-Vyc4';
-    } else if (lower.contains('pull-up') || lower.contains('pull up') || lower.contains('lat')) {
-      return 'https://www.youtube.com/watch?v=eGo4IYlbE5g';
-    } else if (lower.contains('plank')) {
-      return 'https://www.youtube.com/watch?v=B296mZDhrWY';
-    } else if (lower.contains('deadlift')) {
-      return 'https://www.youtube.com/watch?v=XowK9_K25VA';
-    }
-    // Generic backup workout tutorial
-    return 'https://www.youtube.com/watch?v=aclHkVaku9U';
-  }
-
-  /// High-fidelity local AI workout plan generator fallback
-  AiWorkoutResponse _generateSimulatedWorkoutResponse(AiWorkoutRequest request) {
+  /// High-fidelity local AI workout plan generator fallback (now uses corrected video URLs)
+  AiWorkoutResponse _generateSimulatedWorkoutResponse(
+    AiWorkoutRequest request,
+  ) {
     final lowerFocus = request.focus.toLowerCase();
     String routineName = 'AI Cyber-Plat ${request.focus}';
-    String summary = 'A biomechanically optimized routine tailored for ${request.experience} level targeting ${request.focus} with a goal of ${request.goal}.';
+    String summary =
+        'A biomechanically optimized routine tailored for ${request.experience} level targeting ${request.focus} with a goal of ${request.goal}.';
     List<AiWorkoutExercise> exercises = [];
     List<String> warnings = [];
 
     if (request.injuries.toLowerCase() != 'none') {
-      warnings.add('Form adjustment active: Avoid overloading joints affected by injury: ${request.injuries}.');
+      warnings.add(
+        'Form adjustment active: Avoid overloading joints affected by injury: ${request.injuries}.',
+      );
     }
     warnings.add('Ensure camera scanning is active during deep flexions.');
 
-    if (lowerFocus.contains('push') || lowerFocus.contains('chest') || lowerFocus.contains('upper')) {
+    if (lowerFocus.contains('push') ||
+        lowerFocus.contains('chest') ||
+        lowerFocus.contains('upper')) {
       routineName = 'Neural Upper Push Core';
+      final hasShoulderInjury = request.injuries.toLowerCase().contains('shoulder');
       exercises = [
-        AiWorkoutExercise(
-          name: 'Barbell Bench Press',
-          sets: 4,
-          reps: '10 reps',
-          weightKg: '40 kg',
-          rest: '90s',
-          notes: 'Keep shoulders retracted. Scan alignment path with camera overlay.',
-        ),
+        if (!hasShoulderInjury)
+          AiWorkoutExercise(
+            name: 'Barbell Bench Press',
+            sets: 4,
+            reps: '10 reps',
+            weightKg: '40 kg',
+            rest: '90s',
+            notes:
+                'Keep shoulders retracted. Scan alignment path with camera overlay.',
+          ),
         AiWorkoutExercise(
           name: 'Push-Up',
           sets: 3,
@@ -263,7 +435,9 @@ class ApiClient {
           notes: 'Secondary compound pull support core lock.',
         ),
       ];
-    } else if (lowerFocus.contains('leg') || lowerFocus.contains('lower') || lowerFocus.contains('quad')) {
+    } else if (lowerFocus.contains('leg') ||
+        lowerFocus.contains('lower') ||
+        lowerFocus.contains('quad')) {
       routineName = 'Neural Lower Body Optimizer';
       exercises = [
         AiWorkoutExercise(
@@ -272,7 +446,8 @@ class ApiClient {
           reps: '12 reps',
           weightKg: 'Bodyweight',
           rest: '90s',
-          notes: 'Sit deep. Keep back straight and check hip flexion on pose analyzer.',
+          notes:
+              'Sit deep. Keep back straight and check hip flexion on pose analyzer.',
         ),
         AiWorkoutExercise(
           name: 'Standing Calf Raise',
@@ -325,15 +500,30 @@ class ApiClient {
   }
 
   /// High-fidelity local RAG AI Coach chatbot simulator fallback
-  Stream<String> streamSimulatedChatResponse(List<ChatMessageModel> messages) async* {
+  Stream<String> streamSimulatedChatResponse(
+    List<ChatMessageModel> messages, {
+    Map<String, dynamic>? healthMetrics,
+    Map<String, dynamic>? activeSessionLogs,
+  }) async* {
     final userPrompt = messages.isNotEmpty ? messages.last.content : '';
     final lowerPrompt = userPrompt.toLowerCase();
     final isArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(userPrompt);
+
+    // Dynamic metrics text for personalization
+    final goals = healthMetrics?['goals'] as List? ?? ['General Fitness'];
+    final injuries = healthMetrics?['injuries'] as String? ?? 'None';
+    final weight = healthMetrics?['weight']?.toString() ?? '75';
+    final completedSessions = activeSessionLogs?['completedSessions']?.toString() ?? '0';
+
     String responseText = '';
 
     if (isArabic) {
-      if (lowerPrompt.contains('برنامج') || lowerPrompt.contains('تمرين') || lowerPrompt.contains('خطة') || lowerPrompt.contains('جدول')) {
-        responseText = 'أهلاً بك في Core-360! 🌌 أنا مدربك الشخصي بالذكاء الاصطناعي.\n\nلقد قمت بتحليل طلبك وبنيتك البدنية، وأقترح عليك هذه الخطة التدريبية المحسنة للأداء العالي وتفادي الإصابات:\n\n'
+      if (lowerPrompt.contains('برنامج') ||
+          lowerPrompt.contains('تمرين') ||
+          lowerPrompt.contains('خطة') ||
+          lowerPrompt.contains('جدول')) {
+        responseText =
+            'أهلاً بك في Core-360! 🌌 لقد قمت بتحليل طلبك وبنيتك البدنية (الوزن: $weight كجم، الإصابات: $injuries)، وأقترح عليك هذه الخطة التدريبية المحسنة للأداء العالي وتفادي الإصابات:\n\n'
             '[PLAN_PROPOSAL]\n'
             '{\n'
             '  "name": "خطة Core-360 للتحمل والفتنس",\n'
@@ -356,34 +546,31 @@ class ApiClient {
             '        {"reps": 10, "kg": 0.0}\n'
             '      ],\n'
             '      "order": 1\n'
-            '    },\n'
-            '    {\n'
-            '      "workoutId": "plank_005",\n'
-            '      "title": "Forearm Plank",\n'
-            '      "sets": [\n'
-            '        {"reps": 1, "kg": 0.0}\n'
-            '      ],\n'
-            '      "order": 2\n'
             '    }\n'
             '  ]\n'
             '}\n'
             '[/PLAN_PROPOSAL]\n\n'
-            'يمكنك الضغط على البطاقة أعلاه لإضافة هذا الجدول التدريبي مباشرة إلى مكتبة تمارينك والبدء في تتبعه فوراً باستخدام الكاميرا الذكية لتحليل المفاصل.';
+            'يمكنك إضافة هذا الجدول والبدء فوراً باستخدام الكاميرا الذكية لتحليل المفاصل.';
       } else {
-        responseText = 'أهلاً بك! أنا مدربك الرياضي الشخصي الذكي من Core-360. 🏋️‍♂️\n\nكيف يمكنني مساعدتك اليوم؟ يمكنك سؤالي عن كيفية أداء التمارين بشكل صحيح، أو طلب خطة تدريبية مخصصة، أو استشارتي حول التغذية وتفادي الإصابات أثناء التمرين!';
+        responseText =
+            'أهلاً بك! أنا مدربك الشخصي الذكي من Core-360. 🏋️‍♂️ لقد قمت بتحليل استفسارك: "$userPrompt".\n\nبناءً على أهدافك ($goals) ووزنك الحركي الحالي ($weight كجم)، أنصحك بالتركيز على جودة الأداء واستقامة المفاصل. لقد أتممت حتى الآن $completedSessions حصة تدريبية ناجحة، استمر في التقدم!';
       }
     } else {
-      if (lowerPrompt.contains('plan') || lowerPrompt.contains('routine') || lowerPrompt.contains('workout') || lowerPrompt.contains('schedule') || lowerPrompt.contains('generate')) {
-        responseText = 'Welcome to the Core-360 Neural Coaching Sandbox! 🌌 I have compiled a premium biomechanically-safe routine based on your request and historical statistics.\n\nHere is your custom workout proposal designed to build lean volume and bypass joint stress:\n\n'
+      if (lowerPrompt.contains('plan') ||
+          lowerPrompt.contains('routine') ||
+          lowerPrompt.contains('workout') ||
+          lowerPrompt.contains('schedule') ||
+          lowerPrompt.contains('generate')) {
+        responseText =
+            'Welcome to Core-360 Neural Coaching! 🌌 Based on your weight of $weight kg and goals ($goals), here is a custom biomechanically-safe routine designed for you:\n\n'
             '[PLAN_PROPOSAL]\n'
             '{\n'
-            '  "name": "AI Cyber-Plank Conditioning",\n'
+            '  "name": "AI Personal Conditioning",\n'
             '  "exercises": [\n'
             '    {\n'
             '      "workoutId": "squats_003",\n'
             '      "title": "Bodyweight Squat",\n'
             '      "sets": [\n'
-            '        {"reps": 12, "kg": 0.0},\n'
             '        {"reps": 12, "kg": 0.0},\n'
             '        {"reps": 12, "kg": 0.0}\n'
             '      ],\n'
@@ -397,21 +584,14 @@ class ApiClient {
             '        {"reps": 12, "kg": 0.0}\n'
             '      ],\n'
             '      "order": 1\n'
-            '    },\n'
-            '    {\n'
-            '      "workoutId": "plank_005",\n'
-            '      "title": "Forearm Plank",\n'
-            '      "sets": [\n'
-            '        {"reps": 1, "kg": 0.0}\n'
-            '      ],\n'
-            '      "order": 2\n'
             '    }\n'
             '  ]\n'
             '}\n'
             '[/PLAN_PROPOSAL]\n\n'
-            'You can tap the card above to immediately import this routine into your personal library and launch it with live computer vision joint flexion warnings!';
+            'Tap the card above to immediately import this routine into your personal library!';
       } else {
-        responseText = 'Welcome to Core-360 Neural Coaching! 🌌 I am your dedicated AI fitness companion.\n\nAsk me anything about proper joint alignment, squat depth calculations, or request a custom workout split tailored to bypass physical limits!';
+        responseText =
+            'Hello! I am your Core-360 AI performance coach. 🌌 Regarding your prompt: "$userPrompt".\n\nWith your goals ($goals), body stats ($weight kg), and $completedSessions successfully completed sessions, I recommend keeping high focus on control. Let me know if you want to generate a custom training routine!';
       }
     }
 
@@ -430,7 +610,11 @@ class ApiClient {
       if (response.statusCode == 200 && response.data != null) {
         final list = response.data as List? ?? [];
         return list
-            .map((item) => ChatMessageModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .map(
+              (item) => ChatMessageModel.fromJson(
+                Map<String, dynamic>.from(item as Map),
+              ),
+            )
             .toList();
       } else {
         throw DioException(
@@ -452,7 +636,7 @@ class ApiClient {
     String? apiKey,
   }) async {
     final key = apiKey ?? const String.fromEnvironment('GROQ_API_KEY');
-    
+
     if (key.isEmpty || key == 'MOCK_MODE') {
       debugPrint('Groq API Key is empty. Falling back to local AI Simulator.');
       return _generateSimulatedResponse(userPrompt);
@@ -499,8 +683,10 @@ class ApiClient {
     List<Map<String, dynamic>> selectedExercises = [];
 
     final lowerPrompt = userPrompt.toLowerCase();
-    
-    if (lowerPrompt.contains('lower') || lowerPrompt.contains('quadriceps') || lowerPrompt.contains('lower body')) {
+
+    if (lowerPrompt.contains('lower') ||
+        lowerPrompt.contains('quadriceps') ||
+        lowerPrompt.contains('lower body')) {
       routineName = 'AI Leg & Core Developer';
       if (!lowerPrompt.contains('knee')) {
         selectedExercises.add({
@@ -535,7 +721,9 @@ class ApiClient {
         ],
         'order': selectedExercises.length,
       });
-    } else if (lowerPrompt.contains('upper') || lowerPrompt.contains('chest') || lowerPrompt.contains('push')) {
+    } else if (lowerPrompt.contains('upper') ||
+        lowerPrompt.contains('chest') ||
+        lowerPrompt.contains('push')) {
       routineName = 'AI Chest & Triceps Push';
       if (!lowerPrompt.contains('shoulder')) {
         selectedExercises.add({
@@ -614,13 +802,14 @@ class ApiClient {
       'choices': [
         {
           'message': {
-            'content': '''{
+            'content':
+                '''{
               "name": "$routineName",
               "exercises": ${StreamMappingHelper.flatJsonExercises(selectedExercises)}
-            }'''
-          }
-        }
-      ]
+            }''',
+          },
+        },
+      ],
     };
   }
 }
@@ -630,7 +819,9 @@ class StreamMappingHelper {
     final buffer = StringBuffer('[');
     for (int i = 0; i < list.length; i++) {
       final item = list[i];
-      final setsStr = (item['sets'] as List).map((s) => '{"reps": ${s['reps']}, "kg": ${s['kg']}}').join(', ');
+      final setsStr = (item['sets'] as List)
+          .map((s) => '{"reps": ${s['reps']}, "kg": ${s['kg']}}')
+          .join(', ');
       buffer.write('{');
       buffer.write('"workoutId": "${item['workoutId']}",');
       buffer.write('"title": "${item['title']}",');
@@ -645,5 +836,4 @@ class StreamMappingHelper {
 }
 
 // ─── RIVERPOD PROVIDER ──────────────────────────────────────────────
-
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());

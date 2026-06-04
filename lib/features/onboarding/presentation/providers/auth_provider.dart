@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../domain/entities/user_profile.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../data/repositories/auth_repository_impl.dart';
@@ -9,7 +11,7 @@ import '../../data/repositories/auth_repository_impl.dart';
 
 abstract class AuthState {
   const AuthState();
-}
+} 
 
 /// App loading initial configs
 class AuthInitial extends AuthState {
@@ -50,6 +52,7 @@ class AuthError extends AuthState {
 class AuthNotifier extends Notifier<AuthState> {
   late final AuthRepository _authRepository;
   StreamSubscription<fb.User?>? _authSubscription;
+  bool _ignoreAuthStateChanges = false;
 
   @override
   AuthState build() {
@@ -69,6 +72,7 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> _onAuthStateChanged(fb.User? user) async {
+    if (_ignoreAuthStateChanges) return;
     if (user == null) {
       if (!ref.mounted) return;
       state = const Unauthenticated();
@@ -105,16 +109,44 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   /// Signs up with email, password, name and logs entry document
-  Future<void> signUp(String email, String password, String name) async {
+  Future<void> signUp({
+    required String email,
+    required String password,
+    required String name,
+    required bool fingerprintEnabled,
+  }) async {
     state = const AuthLoading();
+    _ignoreAuthStateChanges = true;
+    bool success = false;
     try {
-      await _authRepository.signUpWithEmailAndPassword(email, password, name);
+      final credential = await _authRepository.signUpWithEmailAndPassword(email, password, name);
+      
+      if (credential.user != null) {
+        const storage = FlutterSecureStorage();
+        if (fingerprintEnabled) {
+          await storage.write(key: 'saved_email', value: email.trim());
+          await storage.write(key: 'saved_password', value: password);
+          await storage.write(key: 'fingerprint_enabled', value: 'true');
+        } else {
+          await storage.delete(key: 'saved_email');
+          await storage.delete(key: 'saved_password');
+          await storage.write(key: 'fingerprint_enabled', value: 'false');
+        }
+      }
+
+      await _authRepository.signOut();
+      success = true;
     } on fb.FirebaseAuthException catch (e) {
       if (!ref.mounted) return;
       state = AuthError(e.message ?? 'Registration attempt failed.');
     } catch (e) {
       if (!ref.mounted) return;
       state = AuthError(e.toString());
+    } finally {
+      _ignoreAuthStateChanges = false;
+      if (success) {
+        await _onAuthStateChanged(null);
+      }
     }
   }
 
@@ -123,6 +155,25 @@ class AuthNotifier extends Notifier<AuthState> {
     state = const AuthLoading();
     try {
       await _authRepository.signOut();
+    } catch (e) {
+      if (!ref.mounted) return;
+      state = AuthError(e.toString());
+    }
+  }
+
+  /// Authenticates with cached biometric credentials.
+  /// Catches PlatformException from local_auth channel separately
+  /// to provide clear biometric-specific error messages.
+  Future<void> signInWithBiometrics(String email, String password) async {
+    state = const AuthLoading();
+    try {
+      await _authRepository.signInWithEmailAndPassword(email, password);
+    } on fb.FirebaseAuthException catch (e) {
+      if (!ref.mounted) return;
+      state = AuthError(e.message ?? 'Biometric credentials expired. Please sign in manually.');
+    } on PlatformException catch (e) {
+      if (!ref.mounted) return;
+      state = AuthError('Biometric platform error: ${e.message ?? e.code}');
     } catch (e) {
       if (!ref.mounted) return;
       state = AuthError(e.toString());

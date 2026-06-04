@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise.dart';
 import '../../domain/entities/routine.dart';
@@ -8,6 +9,7 @@ import '../../domain/entities/routine_exercise.dart';
 import '../../domain/entities/set_config.dart';
 import '../providers/workout_provider.dart';
 import 'exercise_picker_screen.dart';
+import '../widgets/exercise_gif_widget.dart';
 
 class RoutineBuilderScreen extends ConsumerStatefulWidget {
   final Routine? existingRoutine;
@@ -22,6 +24,23 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
   late TextEditingController _nameController;
   List<RoutineExercise> _exercises = [];
   bool _isSaving = false;
+
+  Future<void> _launchVideo(String urlString) async {
+    if (urlString.isEmpty) return;
+    final Uri url = Uri.parse(urlString);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open video URL: $urlString'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -212,6 +231,7 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final workoutsAsync = ref.watch(globalWorkoutsProvider);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppTheme.darkBackground,
@@ -328,13 +348,13 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
                             ],
                           ),
                         )
-                      : ListView.builder(
+                       : ListView.builder(
                           physics: const BouncingScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                           itemCount: _exercises.length,
                           itemBuilder: (context, exIdx) {
                             final exercise = _exercises[exIdx];
-                            return _buildExerciseCard(exIdx, exercise);
+                            return _buildExerciseCard(exIdx, exercise, workoutsAsync.value);
                           },
                         ),
                 ),
@@ -354,7 +374,24 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
     );
   }
 
-  Widget _buildExerciseCard(int exIdx, RoutineExercise exercise) {
+  Widget _buildExerciseCard(int exIdx, RoutineExercise exercise, List<Exercise>? globalExercises) {
+    final matchingExercise = globalExercises?.firstWhere(
+      (e) => e.id == exercise.workoutId || e.title.toLowerCase().trim() == exercise.title.toLowerCase().trim(),
+      orElse: () => Exercise(
+        id: '',
+        title: exercise.title,
+        description: '',
+        targetMuscle: exercise.targetMuscle,
+        thumbnailUrl: '',
+        videoUrl: '',
+        gifUrl: '',
+        aiSupported: false,
+      ),
+    );
+    final gifUrl = matchingExercise?.gifUrl ?? '';
+    final thumbnailUrl = matchingExercise?.thumbnailUrl ?? '';
+    final videoUrl = matchingExercise?.videoUrl ?? '';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 18),
       decoration: BoxDecoration(
@@ -387,17 +424,49 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
+
+                // Exercise GIF Widget
+                GestureDetector(
+                  onTap: videoUrl.isNotEmpty ? () => _launchVideo(videoUrl) : null,
+                  child: ExerciseGifWidget(
+                    gifUrl: gifUrl,
+                    thumbnailUrl: thumbnailUrl,
+                    width: 45,
+                    height: 45,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        exercise.title,
-                        style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontSize: 15,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              exercise.title,
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontSize: 15,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (videoUrl.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            GestureDetector(
+                              onTap: () => _launchVideo(videoUrl),
+                              child: const Icon(
+                                Icons.play_circle_outline,
+                                color: AppTheme.cyberCyan,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:core_360_app/core/theme/app_theme.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../providers/auth_provider.dart';
@@ -104,6 +105,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
         return;
       }
 
+      // ── DUPLICATE BIOMETRIC IDENTITY PRE-CHECK ──────────────────────
+      // If biometric credentials are already bound to an account on this device,
+      // fail with an error and reject the enrollment.
+      final existingEnabled = await _secureStorage.read(key: 'fingerprint_enabled');
+      if (!mounted) return;
+
+      if (existingEnabled == 'true') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'FINGERPRINT REGISTRATION REJECTED: Fingerprint already registered on this device.',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        setState(() {
+          _fingerprintEnabled = false;
+        });
+        return;
+      }
+
       final success = await _authenticateBiometrics();
       if (!mounted) return;
       if (success) {
@@ -143,6 +167,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
     }
   }
 
+  // Conflict dialog is deprecated as overrides are no longer permitted.
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -154,30 +180,52 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
   }
 
   Future<void> _submit() async {
-    if (_formKey.currentState!.validate()) {
-      await ref.read(authProvider.notifier).signUp(
-            _emailController.text,
-            _passwordController.text,
-            _nameController.text,
-          );
-      
-      final nextState = ref.read(authProvider);
-      if (nextState is AuthenticatedWithoutProfile || nextState is AuthenticatedWithProfile) {
-        if (_fingerprintEnabled) {
-          try {
-            await _secureStorage.write(key: 'saved_email', value: _emailController.text);
-            await _secureStorage.write(key: 'saved_password', value: _passwordController.text);
-            await _secureStorage.write(key: 'fingerprint_enabled', value: 'true');
-          } catch (_) {}
-        } else {
-          try {
-            await _secureStorage.delete(key: 'saved_email');
-            await _secureStorage.delete(key: 'saved_password');
-            await _secureStorage.write(key: 'fingerprint_enabled', value: 'false');
-          } catch (_) {}
-        }
-      }
+    if (!_formKey.currentState!.validate()) return;
+
+    // Double check if fingerprint is enabled but already registered
+    final existingEnabled = await _secureStorage.read(key: 'fingerprint_enabled');
+    if (_fingerprintEnabled && existingEnabled == 'true') {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'FINGERPRINT REGISTRATION REJECTED: Fingerprint already registered on this device.',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      setState(() {
+        _fingerprintEnabled = false;
+      });
+      return;
     }
+
+    try {
+      await ref.read(authProvider.notifier).signUp(
+        email: _emailController.text,
+        password: _passwordController.text,
+        name: _nameController.text,
+        fingerprintEnabled: _fingerprintEnabled,
+      );
+
+      final authState = ref.read(authProvider);
+      if (authState is AuthError) return;
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'ACCOUNT CREATED SUCCESSFULLY! PLEASE SIGN IN.',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          backgroundColor: AppTheme.cyberCyan,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.pop(context);
+    } catch (_) {}
   }
 
   @override

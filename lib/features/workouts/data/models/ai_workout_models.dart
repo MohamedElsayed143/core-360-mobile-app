@@ -34,6 +34,7 @@ class AiWorkoutExercise {
   final String weightKg;
   final String rest;
   final String notes;
+  final String? videoUrl;
 
   AiWorkoutExercise({
     required this.name,
@@ -42,6 +43,7 @@ class AiWorkoutExercise {
     required this.weightKg,
     required this.rest,
     required this.notes,
+    this.videoUrl,
   });
 
   factory AiWorkoutExercise.fromJson(Map<String, dynamic> json) {
@@ -52,7 +54,20 @@ class AiWorkoutExercise {
       weightKg: (json['weightKg'] ?? '').toString(),
       rest: (json['rest'] ?? '').toString(),
       notes: json['notes'] as String? ?? '',
+      videoUrl: json['videoUrl'] as String?,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'sets': sets,
+      'reps': reps,
+      'weightKg': weightKg,
+      'rest': rest,
+      'notes': notes,
+      if (videoUrl != null) 'videoUrl': videoUrl,
+    };
   }
 }
 
@@ -76,7 +91,10 @@ class AiWorkoutRoutine {
       routineName: json['routineName'] as String? ?? '',
       summary: json['summary'] as String? ?? '',
       exercises: exercisesJson
-          .map((e) => AiWorkoutExercise.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map(
+            (e) =>
+                AiWorkoutExercise.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
           .toList(),
       warnings: warningsJson.map((w) => w.toString()).toList(),
     );

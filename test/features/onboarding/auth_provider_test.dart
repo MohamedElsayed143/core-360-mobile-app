@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:core_360_app/features/onboarding/domain/entities/user_profile.dart';
 import 'package:core_360_app/features/onboarding/domain/repositories/auth_repository.dart';
 import 'package:core_360_app/features/onboarding/presentation/providers/auth_provider.dart';
@@ -89,6 +90,12 @@ class MockAuthRepository implements AuthRepository {
   @override
   Future<fb.UserCredential> signUpWithEmailAndPassword(String email, String password, String name) async {
     signUpCalls++;
+    if (email == 'error@error.com') {
+      throw fb.FirebaseAuthException(
+        code: 'email-already-in-use',
+        message: 'The email address is already in use by another account.',
+      );
+    }
     final user = MockUser(uid: 'mock-uid-123', email: email, displayName: name);
     emitUser(user);
     return MockUserCredential(user);
@@ -216,6 +223,75 @@ void main() {
       expect(container.read(authProvider), isA<AuthenticatedWithProfile>());
       final finalState = container.read(authProvider) as AuthenticatedWithProfile;
       expect(finalState.profile.goals.first, 'Flexibility');
+    });
+
+    test('signUp with fingerprintEnabled = true registers, saves to secure storage, and signs out', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final notifier = container.read(authProvider.notifier);
+
+      await notifier.signUp(
+        email: 'newuser@core360.com',
+        password: 'securePassword123',
+        name: 'New User',
+        fingerprintEnabled: true,
+      );
+
+      expect(mockAuthRepository.signUpCalls, 1);
+      expect(mockAuthRepository.signOutCalls, 1);
+
+      final state = container.read(authProvider);
+      expect(state, isA<Unauthenticated>());
+
+      const storage = FlutterSecureStorage();
+      expect(await storage.read(key: 'fingerprint_enabled'), 'true');
+      expect(await storage.read(key: 'saved_email'), 'newuser@core360.com');
+      expect(await storage.read(key: 'saved_password'), 'securePassword123');
+    });
+
+    test('signUp with fingerprintEnabled = false registers, clears secure storage, and signs out', () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'fingerprint_enabled': 'true',
+        'saved_email': 'olduser@core360.com',
+        'saved_password': 'oldpassword',
+      });
+      final notifier = container.read(authProvider.notifier);
+
+      await notifier.signUp(
+        email: 'anotheruser@core360.com',
+        password: 'securePassword456',
+        name: 'Another User',
+        fingerprintEnabled: false,
+      );
+
+      expect(mockAuthRepository.signUpCalls, 1);
+      expect(mockAuthRepository.signOutCalls, 1);
+
+      final state = container.read(authProvider);
+      expect(state, isA<Unauthenticated>());
+
+      const storage = FlutterSecureStorage();
+      expect(await storage.read(key: 'fingerprint_enabled'), 'false');
+      expect(await storage.read(key: 'saved_email'), isNull);
+      expect(await storage.read(key: 'saved_password'), isNull);
+    });
+
+    test('signUp failure sets state to AuthError and does not sign out', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final notifier = container.read(authProvider.notifier);
+
+      await notifier.signUp(
+        email: 'error@error.com',
+        password: 'password123',
+        name: 'Error User',
+        fingerprintEnabled: false,
+      );
+
+      expect(mockAuthRepository.signUpCalls, 1);
+      expect(mockAuthRepository.signOutCalls, 0);
+
+      final state = container.read(authProvider);
+      expect(state, isA<AuthError>());
+      expect((state as AuthError).message, contains('already in use'));
     });
   });
 

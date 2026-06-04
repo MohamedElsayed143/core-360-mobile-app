@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/routine.dart';
 import '../providers/active_workout_provider.dart';
@@ -14,13 +15,29 @@ class ActiveWorkoutScreen extends ConsumerStatefulWidget {
   const ActiveWorkoutScreen({super.key, required this.routine});
 
   @override
-  ConsumerState<ActiveWorkoutScreen> createState() => _ActiveWorkoutScreenState();
+  ConsumerState<ActiveWorkoutScreen> createState() =>
+      _ActiveWorkoutScreenState();
 }
 
 class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
-  YoutubePlayerController? _ytController;
-  String? _currentVideoId;
   bool _isPlayerVisible = true;
+
+  Future<void> _launchVideo(String urlString) async {
+    if (urlString.isEmpty) return;
+    final Uri url = Uri.parse(urlString);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open video URL: $urlString'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -29,54 +46,15 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
   }
 
   Future<void> _initSession() async {
-    try {
-      final globalWorkouts = await ref.read(globalWorkoutsProvider.future);
-      final videoUrlMap = globalWorkouts
-          .map((ex) => {'workoutId': ex.id, 'videoUrl': ex.videoUrl})
-          .toList();
-      if (mounted) {
-        ref.read(activeWorkoutProvider.notifier).initSession(widget.routine, videoUrlMap);
-      }
-    } catch (_) {
-      if (mounted) {
-        ref.read(activeWorkoutProvider.notifier).initSession(widget.routine, []);
-      }
-    }
-  }
-
-  void _syncYoutubePlayer(String videoUrl) {
-    final videoId = YoutubePlayer.convertUrlToId(videoUrl) ?? '';
-    if (videoId.isEmpty || videoId == _currentVideoId) return;
-    _currentVideoId = videoId;
-    
-    if (_ytController == null) {
-      final controller = YoutubePlayerController(
-        initialVideoId: videoId,
-        flags: const YoutubePlayerFlags(
-          autoPlay: false,
-          mute: false,
-          disableDragSeek: false,
-          forceHD: false,
-        ),
-      );
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {
-            _ytController = controller;
-          });
-        }
-      });
-    } else {
-      try {
-        _ytController!.load(videoId);
-        _ytController!.pause();
-      } catch (_) {}
+    if (mounted) {
+      await ref
+          .read(activeWorkoutProvider.notifier)
+          .initSession(widget.routine);
     }
   }
 
   @override
   void dispose() {
-    _ytController?.dispose();
     ref.read(activeWorkoutProvider.notifier).reset();
     super.dispose();
   }
@@ -85,54 +63,23 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
   Widget build(BuildContext context) {
     final sessionState = ref.watch(activeWorkoutProvider);
 
-    // Sync YouTube player safely on first load
-    final activeEx = sessionState.activeExercise;
-    if (activeEx != null && activeEx.videoUrl.isNotEmpty && _ytController == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _syncYoutubePlayer(activeEx.videoUrl);
-        }
-      });
-    }
-
-    // Handle updates safely via the Riverpod listener outside of the build phase
-    ref.listen(activeWorkoutProvider, (prev, next) {
+    // Synchronize transition states reactively outside the build draw call
+    ref.listen<ActiveWorkoutState>(activeWorkoutProvider, (prev, next) {
       if (next.isFinished && prev?.isFinished != true) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _showTrophySheet(context, next);
         });
       }
-
-      final nextEx = next.activeExercise;
-      if (nextEx != null && nextEx.videoUrl.isNotEmpty) {
-        final prevEx = prev?.activeExercise;
-        if (prevEx == null || prevEx.videoUrl != nextEx.videoUrl) {
-          _syncYoutubePlayer(nextEx.videoUrl);
-        }
-      }
     });
 
-    return YoutubePlayerBuilder(
-      player: YoutubePlayer(
-        controller: _ytController ??
-            YoutubePlayerController(initialVideoId: 'dQw4w9WgXcQ',
-                flags: const YoutubePlayerFlags(autoPlay: false)),
-        showVideoProgressIndicator: true,
-        progressIndicatorColor: AppTheme.cyberCyan,
-        progressColors: const ProgressBarColors(
-          playedColor: AppTheme.cyberCyan,
-          handleColor: AppTheme.electricBlue,
-        ),
-      ),
-      builder: (context, player) {
-        return Scaffold(
-          backgroundColor: AppTheme.darkBackground,
-          appBar: _buildAppBar(sessionState),
-          body: sessionState.exercises.isEmpty
-              ? const Center(child: CircularProgressIndicator(color: AppTheme.cyberCyan))
-              : _buildBody(context, sessionState, player),
-        );
-      },
+    return Scaffold(
+      backgroundColor: AppTheme.darkBackground,
+      appBar: _buildAppBar(sessionState),
+      body: sessionState.exercises.isEmpty
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.cyberCyan),
+            )
+          : _buildBody(context, sessionState),
     );
   }
 
@@ -195,7 +142,10 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
     );
   }
 
-  Widget _buildBody(BuildContext context, ActiveWorkoutState sessionState, Widget player) {
+  Widget _buildBody(
+    BuildContext context,
+    ActiveWorkoutState sessionState,
+  ) {
     return Stack(
       children: [
         // Ambient glows
@@ -245,9 +195,12 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
                     _buildExerciseHeader(sessionState),
                     const SizedBox(height: 16),
 
-                    // ── YOUTUBE PLAYER CAPSULE ───────────────────────
-                    if (_currentVideoId != null && _currentVideoId!.isNotEmpty)
-                      _buildPlayerCapsule(player),
+                    // ── GIF PLAYER CAPSULE / PLACEHOLDER ─────────
+                    if (sessionState.activeExercise != null &&
+                        sessionState.activeExercise!.gifUrl.isNotEmpty)
+                      _buildPlayerCapsule(sessionState.activeExercise!.gifUrl)
+                    else
+                      _buildPlaceholderCapsule(),
 
                     const SizedBox(height: 16),
 
@@ -283,7 +236,9 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(state.exercises.length, (i) {
           final isActive = i == state.activeIndex;
-          final isCompleted = state.exercises[i].sets.every((s) => s.isCompleted);
+          final isCompleted = state.exercises[i].sets.every(
+            (s) => s.isCompleted,
+          );
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -294,8 +249,8 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
               color: isCompleted
                   ? AppTheme.cyberCyan
                   : isActive
-                      ? AppTheme.electricBlue
-                      : AppTheme.cardBorderColor,
+                  ? AppTheme.electricBlue
+                  : AppTheme.cardBorderColor,
             ),
           );
         }),
@@ -311,7 +266,10 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
       decoration: BoxDecoration(
         color: AppTheme.darkSurface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.electricBlue.withOpacity(0.3), width: 1.2),
+        border: Border.all(
+          color: AppTheme.electricBlue.withOpacity(0.3),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
             color: AppTheme.electricBlue.withOpacity(0.04),
@@ -357,7 +315,10 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.cyberCyan.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(8),
@@ -385,20 +346,20 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
               ],
             ),
           ),
-          if (ex.videoUrl.isNotEmpty)
+          if (ex.gifUrl.isNotEmpty)
             GestureDetector(
               onTap: () => setState(() => _isPlayerVisible = !_isPlayerVisible),
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.redAccent.withOpacity(0.08),
+                  color: AppTheme.cyberCyan.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   _isPlayerVisible
                       ? Icons.videocam_outlined
                       : Icons.videocam_off_outlined,
-                  color: Colors.redAccent,
+                  color: AppTheme.cyberCyan,
                   size: 20,
                 ),
               ),
@@ -408,7 +369,10 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
     );
   }
 
-  Widget _buildPlayerCapsule(Widget player) {
+  Widget _buildPlayerCapsule(String gifUrl) {
+    final activeEx = ref.read(activeWorkoutProvider).activeExercise;
+    final videoUrl = activeEx?.videoUrl ?? '';
+
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
       child: _isPlayerVisible
@@ -417,21 +381,30 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.redAccent.withOpacity(0.25), width: 1.2),
+                border: Border.all(
+                  color: AppTheme.cyberCyan.withOpacity(0.25),
+                  width: 1.2,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     color: AppTheme.darkSurface,
                     child: Row(
                       children: [
-                        const Icon(Icons.play_circle_outline,
-                            color: Colors.redAccent, size: 16),
+                        const Icon(
+                          Icons.play_circle_outline,
+                          color: AppTheme.cyberCyan,
+                          size: 16,
+                        ),
                         const SizedBox(width: 8),
                         Text(
-                          'FORM GUIDE TUTORIAL',
+                          'ANIMATED FORM GUIDE',
                           style: GoogleFonts.outfit(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -439,14 +412,107 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
                             letterSpacing: 1.0,
                           ),
                         ),
+                        const Spacer(),
+                        if (videoUrl.isNotEmpty)
+                          GestureDetector(
+                            onTap: () => _launchVideo(videoUrl),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.open_in_new,
+                                  color: AppTheme.cyberCyan,
+                                  size: 12,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'WATCH VIDEO',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.cyberCyan,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                  player,
+                  GestureDetector(
+                    onTap: videoUrl.isNotEmpty ? () => _launchVideo(videoUrl) : null,
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: CachedNetworkImage(
+                        imageUrl: gifUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(color: AppTheme.cyberCyan),
+                        ),
+                        errorWidget: (context, url, error) => const Center(
+                          child: Icon(Icons.broken_image, color: Colors.white24, size: 40),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             )
           : const SizedBox.shrink(key: ValueKey('player_hidden')),
+    );
+  }
+
+  Widget _buildPlaceholderCapsule() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+      decoration: BoxDecoration(
+        color: AppTheme.darkSurface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.amethystPurple.withOpacity(0.25),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.amethystPurple.withOpacity(0.04),
+            blurRadius: 20,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppTheme.amethystPurple.withOpacity(0.08),
+            ),
+            child: const Icon(
+              Icons.fitness_center_rounded,
+              color: AppTheme.amethystPurple,
+              size: 36,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'CUSTOM EXERCISE',
+            style: GoogleFonts.outfit(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Form Guide Not Required',
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              color: Colors.white38,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -488,14 +554,19 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
               weight: set.weight,
               reps: set.reps,
               isCompleted: set.isCompleted,
-              onWeightChanged: (v) =>
-                  ref.read(activeWorkoutProvider.notifier).updateWeight(exIndex, setIndex, v),
-              onRepsChanged: (v) =>
-                  ref.read(activeWorkoutProvider.notifier).updateReps(exIndex, setIndex, v),
-              onToggleComplete: () =>
-                  ref.read(activeWorkoutProvider.notifier).toggleSetCompleted(exIndex, setIndex),
+              onWeightChanged: (v) => ref
+                  .read(activeWorkoutProvider.notifier)
+                  .updateWeight(exIndex, setIndex, v),
+              onRepsChanged: (v) => ref
+                  .read(activeWorkoutProvider.notifier)
+                  .updateReps(exIndex, setIndex, v),
+              onToggleComplete: () => ref
+                  .read(activeWorkoutProvider.notifier)
+                  .toggleSetCompleted(exIndex, setIndex),
               onDelete: ex.sets.length > 1
-                  ? () => ref.read(activeWorkoutProvider.notifier).deleteSet(exIndex, setIndex)
+                  ? () => ref
+                        .read(activeWorkoutProvider.notifier)
+                        .deleteSet(exIndex, setIndex)
                   : null,
             );
           }),
@@ -537,7 +608,11 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.add, color: AppTheme.cyberCyan.withOpacity(0.8), size: 18),
+            Icon(
+              Icons.add,
+              color: AppTheme.cyberCyan.withOpacity(0.8),
+              size: 18,
+            ),
             const SizedBox(width: 8),
             Text(
               'ADD SET',
@@ -568,26 +643,35 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             Expanded(
               child: GestureDetector(
                 onTap: state.hasPrev
-                    ? () => ref.read(activeWorkoutProvider.notifier).previousExercise()
+                    ? () => ref
+                          .read(activeWorkoutProvider.notifier)
+                          .previousExercise()
                     : null,
                 child: Container(
                   height: 50,
                   decoration: BoxDecoration(
-                    color: state.hasPrev ? AppTheme.darkSurface : AppTheme.darkSurface.withOpacity(0.3),
+                    color: state.hasPrev
+                        ? AppTheme.darkSurface
+                        : AppTheme.darkSurface.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppTheme.cardBorderColor),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.chevron_left,
-                          color: state.hasPrev ? Colors.white70 : Colors.white24, size: 20),
+                      Icon(
+                        Icons.chevron_left,
+                        color: state.hasPrev ? Colors.white70 : Colors.white24,
+                        size: 20,
+                      ),
                       Text(
                         'PREV',
                         style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: state.hasPrev ? Colors.white70 : Colors.white24,
+                          color: state.hasPrev
+                              ? Colors.white70
+                              : Colors.white24,
                         ),
                       ),
                     ],
@@ -600,7 +684,9 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             Expanded(
               child: GestureDetector(
                 onTap: state.hasNext
-                    ? () => ref.read(activeWorkoutProvider.notifier).nextExercise()
+                    ? () => ref
+                          .read(activeWorkoutProvider.notifier)
+                          .nextExercise()
                     : () => _triggerEndWorkout(),
                 child: Container(
                   height: 50,
@@ -608,7 +694,9 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
                     gradient: state.hasNext ? null : AppTheme.secondaryGradient,
                     borderRadius: BorderRadius.circular(16),
                     border: state.hasNext
-                        ? Border.all(color: AppTheme.electricBlue.withOpacity(0.4))
+                        ? Border.all(
+                            color: AppTheme.electricBlue.withOpacity(0.4),
+                          )
                         : null,
                     color: state.hasNext ? AppTheme.darkSurface : null,
                   ),
@@ -624,7 +712,9 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
                         ),
                       ),
                       Icon(
-                        state.hasNext ? Icons.chevron_right : Icons.emoji_events_outlined,
+                        state.hasNext
+                            ? Icons.chevron_right
+                            : Icons.emoji_events_outlined,
                         color: state.hasNext ? Colors.white70 : Colors.white,
                         size: 18,
                       ),
@@ -657,14 +747,21 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
         ),
         content: Text(
           'Save this session and view your performance trophy.',
-          style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13, height: 1.4),
+          style: GoogleFonts.outfit(
+            color: Colors.white70,
+            fontSize: 13,
+            height: 1.4,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text(
               'CONTINUE',
-              style: GoogleFonts.outfit(color: Colors.white30, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(
+                color: Colors.white30,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           TextButton(
@@ -696,7 +793,10 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
         ),
         title: Text(
           'DISCARD SESSION?',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         content: Text(
           'Any progress in this session will not be saved.',
@@ -707,7 +807,10 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             onPressed: () => Navigator.pop(ctx),
             child: Text(
               'STAY',
-              style: GoogleFonts.outfit(color: Colors.white30, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(
+                color: Colors.white30,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           TextButton(
@@ -718,7 +821,10 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             },
             child: Text(
               'DISCARD',
-              style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -872,7 +978,8 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
   void initState() {
     super.initState();
     _weightCtrl = TextEditingController(
-        text: widget.weight == 0.0 ? '' : widget.weight.toStringAsFixed(1));
+      text: widget.weight == 0.0 ? '' : widget.weight.toStringAsFixed(1),
+    );
     _repsCtrl = TextEditingController(text: widget.reps.toString());
     _weightFocus = FocusNode();
     _repsFocus = FocusNode();
@@ -883,8 +990,9 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
     super.didUpdateWidget(oldWidget);
     // Only update controller if focus isn't active (not being edited)
     if (!_weightFocus.hasFocus) {
-      final newText =
-          widget.weight == 0.0 ? '' : widget.weight.toStringAsFixed(1);
+      final newText = widget.weight == 0.0
+          ? ''
+          : widget.weight.toStringAsFixed(1);
       if (_weightCtrl.text != newText) _weightCtrl.text = newText;
     }
     if (!_repsFocus.hasFocus) {
@@ -940,7 +1048,9 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
                 focusNode: _weightFocus,
                 hint: '0.0',
                 suffix: 'kg',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
@@ -1060,13 +1170,17 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
             hintText: hint,
             hintStyle: GoogleFonts.outfit(color: Colors.white24, fontSize: 12),
             suffixText: suffix.isNotEmpty ? suffix : null,
-            suffixStyle:
-                GoogleFonts.outfit(color: Colors.white38, fontSize: 10),
+            suffixStyle: GoogleFonts.outfit(
+              color: Colors.white38,
+              fontSize: 10,
+            ),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 6,
+              vertical: 10,
+            ),
             isDense: true,
           ),
         ),
@@ -1104,7 +1218,9 @@ class _TrophySheet extends StatelessWidget {
       decoration: const BoxDecoration(
         color: AppTheme.darkSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        border: Border(top: BorderSide(color: AppTheme.cardBorderColor, width: 1)),
+        border: Border(
+          top: BorderSide(color: AppTheme.cardBorderColor, width: 1),
+        ),
       ),
       padding: const EdgeInsets.fromLTRB(28, 24, 28, 40),
       child: SafeArea(
@@ -1125,7 +1241,11 @@ class _TrophySheet extends StatelessWidget {
             // Trophy icon
             ShaderMask(
               shaderCallback: (b) => AppTheme.secondaryGradient.createShader(b),
-              child: const Icon(Icons.emoji_events, color: Colors.white, size: 64),
+              child: const Icon(
+                Icons.emoji_events,
+                color: Colors.white,
+                size: 64,
+              ),
             ),
             const SizedBox(height: 12),
 
@@ -1152,30 +1272,37 @@ class _TrophySheet extends StatelessWidget {
             // Metrics grid
             Row(
               children: [
-                _metricTile('DURATION', durationFormatted, Icons.timer_outlined,
-                    AppTheme.cyberCyan),
+                _metricTile(
+                  'DURATION',
+                  durationFormatted,
+                  Icons.timer_outlined,
+                  AppTheme.cyberCyan,
+                ),
                 const SizedBox(width: 12),
                 _metricTile(
-                    'WEIGHT LIFTED',
-                    '${totalWeightKg.toStringAsFixed(1)} kg',
-                    Icons.fitness_center,
-                    AppTheme.electricBlue),
+                  'WEIGHT LIFTED',
+                  '${totalWeightKg.toStringAsFixed(1)} kg',
+                  Icons.fitness_center,
+                  AppTheme.electricBlue,
+                ),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 _metricTile(
-                    'SETS DONE',
-                    '$completedSets / $totalSets',
-                    Icons.check_circle_outline,
-                    AppTheme.amethystPurple),
+                  'SETS DONE',
+                  '$completedSets / $totalSets',
+                  Icons.check_circle_outline,
+                  AppTheme.amethystPurple,
+                ),
                 const SizedBox(width: 12),
                 _metricTile(
-                    'COMPLETION',
-                    '${pct.toStringAsFixed(0)}%',
-                    Icons.bar_chart,
-                    AppTheme.warningAmber),
+                  'COMPLETION',
+                  '${pct.toStringAsFixed(0)}%',
+                  Icons.bar_chart,
+                  AppTheme.warningAmber,
+                ),
               ],
             ),
             const SizedBox(height: 20),
@@ -1204,8 +1331,8 @@ class _TrophySheet extends StatelessWidget {
                       pct >= 80
                           ? AppTheme.cyberCyan
                           : pct >= 50
-                              ? AppTheme.warningAmber
-                              : Colors.redAccent,
+                          ? AppTheme.warningAmber
+                          : Colors.redAccent,
                     ),
                   ),
                 ),

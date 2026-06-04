@@ -9,6 +9,7 @@ class ExerciseModel extends Exercise {
     required super.targetMuscle,
     required super.thumbnailUrl,
     required super.videoUrl,
+    super.gifUrl = '',
     required super.aiSupported,
   });
 
@@ -21,6 +22,7 @@ class ExerciseModel extends Exercise {
       targetMuscle: data['targetMuscle'] as String? ?? '',
       thumbnailUrl: data['thumbnailUrl'] as String? ?? '',
       videoUrl: data['videoUrl'] as String? ?? '',
+      gifUrl: data['gifUrl'] as String? ?? '',
       aiSupported: data['aiSupported'] as bool? ?? false,
     );
   }
@@ -33,6 +35,7 @@ class ExerciseModel extends Exercise {
       targetMuscle: data['targetMuscle'] as String? ?? '',
       thumbnailUrl: data['thumbnailUrl'] as String? ?? '',
       videoUrl: data['videoUrl'] as String? ?? '',
+      gifUrl: data['gifUrl'] as String? ?? '',
       aiSupported: data['aiSupported'] as bool? ?? false,
     );
   }
@@ -44,6 +47,7 @@ class ExerciseModel extends Exercise {
       'targetMuscle': targetMuscle,
       'thumbnailUrl': thumbnailUrl,
       'videoUrl': videoUrl,
+      'gifUrl': gifUrl,
       'aiSupported': aiSupported,
     };
   }

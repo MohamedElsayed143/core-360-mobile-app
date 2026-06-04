@@ -94,7 +94,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70, size: 18),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.white70,
+            size: 18,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -133,7 +137,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     color: AppTheme.cyberCyan.withOpacity(0.02),
                     blurRadius: 100,
                     spreadRadius: 30,
-                  )
+                  ),
                 ],
               ),
             ),
@@ -152,7 +156,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     color: AppTheme.amethystPurple.withOpacity(0.02),
                     blurRadius: 120,
                     spreadRadius: 40,
-                  )
+                  ),
                 ],
               ),
             ),
@@ -168,7 +172,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     : ListView.builder(
                         controller: _scrollController,
                         physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 16,
+                        ),
                         itemCount: chatState.messages.length,
                         itemBuilder: (context, index) {
                           final message = chatState.messages[index];
@@ -198,16 +205,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               decoration: BoxDecoration(
                 color: AppTheme.darkSurface,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppTheme.cyberCyan.withOpacity(0.2), width: 1.5),
+                border: Border.all(
+                  color: AppTheme.cyberCyan.withOpacity(0.2),
+                  width: 1.5,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: AppTheme.cyberCyan.withOpacity(0.03),
                     blurRadius: 30,
-                  )
+                  ),
                 ],
               ),
               child: ShaderMask(
-                shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
+                shaderCallback: (bounds) =>
+                    AppTheme.primaryGradient.createShader(bounds),
                 child: const Icon(
                   Icons.auto_awesome,
                   size: 48,
@@ -283,17 +294,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(ChatMessageModel message, List<Exercise> globalWorkouts) {
+  Widget _buildMessageBubble(
+    ChatMessageModel message,
+    List<Exercise> globalWorkouts,
+  ) {
     final isUser = message.role == 'user';
     final hasProposal = message.planProposal != null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
-        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            mainAxisAlignment: isUser
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!isUser) ...[
@@ -304,10 +322,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   decoration: BoxDecoration(
                     color: AppTheme.darkSurface,
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppTheme.cyberCyan.withValues(alpha: 0.3), width: 1.0),
+                    border: Border.all(
+                      color: AppTheme.cyberCyan.withValues(alpha: 0.3),
+                      width: 1.0,
+                    ),
                   ),
                   child: const Center(
-                    child: Icon(Icons.bolt, color: AppTheme.cyberCyan, size: 16),
+                    child: Icon(
+                      Icons.bolt,
+                      color: AppTheme.cyberCyan,
+                      size: 16,
+                    ),
                   ),
                 ),
               ],
@@ -315,7 +340,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isUser ? AppTheme.darkSurface : AppTheme.darkSurface.withValues(alpha: 0.95),
+                    color: isUser
+                        ? AppTheme.darkSurface
+                        : AppTheme.darkSurface.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(20),
                       topRight: const Radius.circular(20),
@@ -323,7 +350,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       bottomRight: Radius.circular(isUser ? 4 : 20),
                     ),
                     border: Border.all(
-                      color: isUser ? AppTheme.cyberCyan.withValues(alpha: 0.3) : AppTheme.cardBorderColor,
+                      color: isUser
+                          ? AppTheme.cyberCyan.withValues(alpha: 0.3)
+                          : AppTheme.cardBorderColor,
                       width: 1.2,
                     ),
                   ),
@@ -361,22 +390,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       decoration: BoxDecoration(
                         color: AppTheme.darkSurface,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.cardBorderColor, width: 1.0),
+                        border: Border.all(
+                          color: AppTheme.cardBorderColor,
+                          width: 1.0,
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           InkWell(
-                            onTap: () => setBubbleState(() => expanded = !expanded),
+                            onTap: () =>
+                                setBubbleState(() => expanded = !expanded),
                             borderRadius: BorderRadius.circular(16),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(Icons.psychology_outlined, color: AppTheme.cyberCyan, size: 18),
+                                      const Icon(
+                                        Icons.psychology_outlined,
+                                        color: AppTheme.cyberCyan,
+                                        size: 18,
+                                      ),
                                       const SizedBox(width: 8),
                                       Text(
                                         'AI Coach Thought Process',
@@ -389,7 +430,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     ],
                                   ),
                                   Icon(
-                                    expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                    expanded
+                                        ? Icons.keyboard_arrow_up
+                                        : Icons.keyboard_arrow_down,
                                     color: Colors.white30,
                                     size: 18,
                                   ),
@@ -412,7 +455,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ],
                       ),
                     );
-                  }
+                  },
                 );
               }(),
             ),
@@ -421,7 +464,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.only(left: 40),
-              child: _buildPlanProposalCard(message.planProposal!, globalWorkouts),
+              child: _buildPlanProposalCard(
+                message.planProposal!,
+                globalWorkouts,
+              ),
             ),
           ],
         ],
@@ -429,18 +475,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildPlanProposalCard(PlanProposalModel proposal, List<Exercise> globalWorkouts) {
+  Widget _buildPlanProposalCard(
+    PlanProposalModel proposal,
+    List<Exercise> globalWorkouts,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.darkSurface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.cyberCyan.withOpacity(0.4), width: 1.2),
+        border: Border.all(
+          color: AppTheme.cyberCyan.withOpacity(0.4),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
             color: AppTheme.cyberCyan.withOpacity(0.04),
             blurRadius: 20,
-          )
+          ),
         ],
       ),
       child: Column(
@@ -449,8 +501,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Row(
             children: [
               ShaderMask(
-                shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
-                child: const Icon(Icons.auto_awesome_outlined, color: Colors.white, size: 20),
+                shaderCallback: (bounds) =>
+                    AppTheme.primaryGradient.createShader(bounds),
+                child: const Icon(
+                  Icons.auto_awesome_outlined,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -471,7 +528,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: proposal.exercises.length,
-            separatorBuilder: (context, index) => const Divider(color: AppTheme.cardBorderColor, height: 16),
+            separatorBuilder: (context, index) =>
+                const Divider(color: AppTheme.cardBorderColor, height: 16),
             itemBuilder: (context, idx) {
               final ex = proposal.exercises[idx];
               final isUpcoming = ex.status == 'upcoming';
@@ -482,9 +540,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     height: 28,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isUpcoming ? AppTheme.glassFillColor : AppTheme.cyberCyan.withOpacity(0.08),
+                      color: isUpcoming
+                          ? AppTheme.glassFillColor
+                          : AppTheme.cyberCyan.withOpacity(0.08),
                       border: Border.all(
-                        color: isUpcoming ? AppTheme.cardBorderColor : AppTheme.cyberCyan.withOpacity(0.5),
+                        color: isUpcoming
+                            ? AppTheme.cardBorderColor
+                            : AppTheme.cyberCyan.withOpacity(0.5),
                         width: 1.0,
                       ),
                     ),
@@ -521,9 +583,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: isUpcoming ? AppTheme.glassFillColor : AppTheme.cyberCyan.withOpacity(0.06),
+                      color: isUpcoming
+                          ? AppTheme.glassFillColor
+                          : AppTheme.cyberCyan.withOpacity(0.06),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -561,7 +628,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.add_box_outlined, color: Colors.black, size: 18),
+                    const Icon(
+                      Icons.add_box_outlined,
+                      color: Colors.black,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'IMPORT TO ROUTINES',
@@ -582,52 +653,70 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Future<void> _importProposal(PlanProposalModel proposal, List<Exercise> globalWorkouts) async {
+  Future<void> _importProposal(
+    PlanProposalModel proposal,
+    List<Exercise> globalWorkouts,
+  ) async {
     try {
+      final apiClient = ref.read(apiClientProvider);
+      final exercises = <RoutineExercise>[];
+
+      for (final e in proposal.exercises) {
+        final resolvedVideoUrl = await apiClient.getWorkoutVideoUrl(e.name);
+        final resolvedGifUrl = await apiClient.getWorkoutGifUrl(e.name);
+
+        final matchedEx = globalWorkouts.firstWhere(
+          (w) =>
+              w.title.toLowerCase().contains(e.name.toLowerCase()) ||
+              e.name.toLowerCase().contains(w.title.toLowerCase()),
+          orElse: () => Exercise(
+            id: 'dynamic_${e.key}',
+            title: e.name,
+            description: '',
+            targetMuscle: 'full_body',
+            thumbnailUrl: '',
+            videoUrl: resolvedVideoUrl,
+            gifUrl: resolvedGifUrl,
+            aiSupported: false,
+          ),
+        );
+
+        int numSets = 3;
+        final setMatch = RegExp(r'(\d+)x').firstMatch(e.sets);
+        if (setMatch != null) {
+          numSets = int.tryParse(setMatch.group(1)!) ?? 3;
+        } else {
+          final setMatch2 = RegExp(r'(\d+)').firstMatch(e.sets);
+          if (setMatch2 != null) {
+            numSets = int.tryParse(setMatch2.group(1)!) ?? 3;
+          }
+        }
+
+        int reps = 10;
+        final repsMatch = RegExp(r'x(\d+)').firstMatch(e.sets);
+        if (repsMatch != null) {
+          reps = int.tryParse(repsMatch.group(1)!) ?? 10;
+        }
+
+        exercises.add(
+          RoutineExercise(
+            workoutId: matchedEx.id,
+            title: matchedEx.title,
+            targetMuscle: matchedEx.targetMuscle,
+            sets: List.generate(
+              numSets,
+              (_) => SetConfig(reps: reps, weight: 0.0),
+            ),
+            order: proposal.exercises.indexOf(e),
+          ),
+        );
+      }
+
       final routine = Routine(
         id: '',
         userId: '', // WorkoutNotifier handles injection of active UID
         name: 'AI Coach Plan Proposal',
-        exercises: proposal.exercises.map((e) {
-          final matchedEx = globalWorkouts.firstWhere(
-            (w) => w.title.toLowerCase().contains(e.name.toLowerCase()) ||
-                   e.name.toLowerCase().contains(w.title.toLowerCase()),
-            orElse: () => Exercise(
-              id: 'dynamic_${e.key}',
-              title: e.name,
-              description: '',
-              targetMuscle: 'full_body',
-              thumbnailUrl: '',
-              videoUrl: ApiClient.resolveWorkoutVideoUrl(e.name),
-              aiSupported: false,
-            ),
-          );
-
-          int numSets = 3;
-          final setMatch = RegExp(r'(\d+)x').firstMatch(e.sets);
-          if (setMatch != null) {
-            numSets = int.tryParse(setMatch.group(1)!) ?? 3;
-          } else {
-            final setMatch2 = RegExp(r'(\d+)').firstMatch(e.sets);
-            if (setMatch2 != null) {
-              numSets = int.tryParse(setMatch2.group(1)!) ?? 3;
-            }
-          }
-
-          int reps = 10;
-          final repsMatch = RegExp(r'x(\d+)').firstMatch(e.sets);
-          if (repsMatch != null) {
-            reps = int.tryParse(repsMatch.group(1)!) ?? 10;
-          }
-
-          return RoutineExercise(
-            workoutId: matchedEx.id,
-            title: matchedEx.title,
-            targetMuscle: matchedEx.targetMuscle,
-            sets: List.generate(numSets, (_) => SetConfig(reps: reps, weight: 0.0)),
-            order: proposal.exercises.indexOf(e),
-          );
-        }).toList(),
+        exercises: exercises,
         isAiGenerated: true,
         createdAt: DateTime.now(),
       );
@@ -666,10 +755,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       decoration: BoxDecoration(
         color: AppTheme.darkBackground,
         border: const Border(
-          top: BorderSide(
-            color: AppTheme.cardBorderColor,
-            width: 1.0,
-          ),
+          top: BorderSide(color: AppTheme.cardBorderColor, width: 1.0),
         ),
       ),
       child: SafeArea(
@@ -680,7 +766,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 decoration: BoxDecoration(
                   color: AppTheme.darkSurface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
+                  border: Border.all(
+                    color: AppTheme.cardBorderColor,
+                    width: 1.2,
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -689,16 +778,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       child: TextField(
                         controller: _messageController,
                         textCapitalization: TextCapitalization.sentences,
-                        style: GoogleFonts.outfit(color: Colors.white, fontSize: 14),
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
                         decoration: InputDecoration(
-                          hintText: chatState.isStreaming 
-                              ? 'Coach is compiling response...' 
+                          hintText: chatState.isStreaming
+                              ? 'Coach is compiling response...'
                               : 'Ask RAG Coach anything...',
-                          hintStyle: GoogleFonts.outfit(color: Colors.white30, fontSize: 13),
+                          hintStyle: GoogleFonts.outfit(
+                            color: Colors.white30,
+                            fontSize: 13,
+                          ),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 14,
+                          ),
                           filled: false,
                         ),
                         onSubmitted: (_) => _sendMessage(),
@@ -715,8 +812,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  gradient: chatState.isStreaming ? null : AppTheme.primaryGradient,
-                  color: chatState.isStreaming ? AppTheme.cardBorderColor : null,
+                  gradient: chatState.isStreaming
+                      ? null
+                      : AppTheme.primaryGradient,
+                  color: chatState.isStreaming
+                      ? AppTheme.cardBorderColor
+                      : null,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     if (!chatState.isStreaming)
@@ -724,7 +825,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         color: AppTheme.cyberCyan.withOpacity(0.2),
                         blurRadius: 10,
                         spreadRadius: 1,
-                      )
+                      ),
                   ],
                 ),
                 child: Center(

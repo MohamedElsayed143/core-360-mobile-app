@@ -5,6 +5,7 @@ class Exercise {
   final String targetMuscle;
   final String thumbnailUrl;
   final String videoUrl;
+  final String gifUrl;
   final bool aiSupported;
 
   Exercise({
@@ -14,6 +15,7 @@ class Exercise {
     required this.targetMuscle,
     required this.thumbnailUrl,
     required this.videoUrl,
+    this.gifUrl = '',
     required this.aiSupported,
   });
 }

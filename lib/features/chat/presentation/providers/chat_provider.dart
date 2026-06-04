@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/models/chat_message_model.dart';
+import '../../../onboarding/presentation/providers/auth_provider.dart';
+import '../../../workouts/presentation/providers/analytics_provider.dart';
 
 class ChatState {
   final List<ChatMessageModel> messages;
@@ -71,12 +73,45 @@ class ChatNotifier extends Notifier<ChatState> {
     final apiClient = ref.read(apiClientProvider);
     final accumulatedBuffer = StringBuffer();
 
+    // ── Extract real user context from Riverpod providers ──────────
+    Map<String, dynamic>? healthMetrics;
+    Map<String, dynamic>? activeSessionLogs;
+
+    try {
+      final authState = ref.read(authProvider);
+      if (authState is AuthenticatedWithProfile) {
+        final profile = authState.profile;
+        healthMetrics = {
+          'weight': profile.weight,
+          'height': profile.height,
+          'age': profile.age,
+          'goals': profile.goals,
+          'injuries': profile.injuries ?? 'None',
+          if (profile.bodyFat != null) 'bodyFat': profile.bodyFat,
+          if (profile.muscleMass != null) 'muscleMass': profile.muscleMass,
+        };
+      }
+
+      final analytics = ref.read(analyticsProvider);
+      activeSessionLogs = {
+        'completedSessions': analytics.completedSessions,
+        'totalVolume': analytics.totalVolume,
+        'averageAccuracy': analytics.averageAccuracy,
+        'totalMinutes': analytics.totalMinutes,
+        'lookbackDays': analytics.lookbackDays,
+      };
+    } catch (e) {
+      debugPrint('Failed to extract user context for RAG injection: $e');
+    }
+
     bool yieldedAny = false;
 
     try {
       // Stream chunks from backend SSE endpoint with a 6-second timeout
       final stream = apiClient.streamChat(
         state.messages.where((m) => m.id != assistantMsgId).toList(),
+        healthMetrics: healthMetrics,
+        activeSessionLogs: activeSessionLogs,
       ).timeout(const Duration(seconds: 6));
 
       await for (final chunk in stream) {
@@ -106,6 +141,8 @@ class ChatNotifier extends Notifier<ChatState> {
       try {
         final simulatedStream = apiClient.streamSimulatedChatResponse(
           state.messages.where((m) => m.id != assistantMsgId).toList(),
+          healthMetrics: healthMetrics,
+          activeSessionLogs: activeSessionLogs,
         );
         await for (final chunk in simulatedStream) {
           accumulatedBuffer.write(chunk);

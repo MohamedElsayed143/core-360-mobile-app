@@ -14,7 +14,8 @@ class AiPlannerState {
   final int step; // 0 to 3
   final String experienceLevel; // 'beginner', 'intermediate', 'advanced'
   final int trainingFrequency; // 2 to 6
-  final String splitFocus; // 'full_body', 'upper', 'lower', 'push', 'pull', 'core'
+  final String
+  splitFocus; // 'full_body', 'upper', 'lower', 'push', 'pull', 'core'
   final bool isGenerating;
   final String? errorMessage;
   final Routine? generatedRoutine;
@@ -95,7 +96,8 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
     }
   }
 
-  String _capitalize(String s) => s.isEmpty ? '' : s[0].toUpperCase() + s.substring(1);
+  String _capitalize(String s) =>
+      s.isEmpty ? '' : s[0].toUpperCase() + s.substring(1);
 
   int _parseReps(String repsStr) {
     final match = RegExp(r'\d+').firstMatch(repsStr);
@@ -150,7 +152,11 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
     final globalWorkoutsAsync = ref.read(globalWorkoutsProvider);
     final globalWorkouts = globalWorkoutsAsync.value ?? [];
 
-    state = state.copyWith(isGenerating: true, errorMessage: null, generatedRoutine: null);
+    state = state.copyWith(
+      isGenerating: true,
+      errorMessage: null,
+      generatedRoutine: null,
+    );
 
     try {
       final apiClient = ref.read(apiClientProvider);
@@ -172,27 +178,39 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
       final List<RoutineExercise> exercises = [];
       for (int i = 0; i < routineData.exercises.length; i++) {
         final apiEx = routineData.exercises[i];
-        
-        // Find corresponding exercise in globalWorkouts
-        final matchedExercise = globalWorkouts.firstWhere(
-          (w) => w.title.toLowerCase().trim() == apiEx.name.toLowerCase().trim(),
-          orElse: () {
-            // Fallback substring matching
-            return globalWorkouts.firstWhere(
-              (w) => w.title.toLowerCase().contains(apiEx.name.toLowerCase()) ||
-                     apiEx.name.toLowerCase().contains(w.title.toLowerCase()),
-              orElse: () => Exercise(
-                id: 'dynamic_${apiEx.name.toLowerCase().replaceAll(' ', '_')}',
-                title: apiEx.name,
-                description: apiEx.notes,
-                targetMuscle: state.splitFocus == 'lower' ? 'legs' : 'chest',
-                thumbnailUrl: '',
-                videoUrl: ApiClient.resolveWorkoutVideoUrl(apiEx.name),
-                aiSupported: false,
-              ),
+
+        Exercise matchedExercise;
+        try {
+          matchedExercise = globalWorkouts.firstWhere(
+            (w) =>
+                w.title.toLowerCase().trim() == apiEx.name.toLowerCase().trim(),
+          );
+        } catch (_) {
+          try {
+            matchedExercise = globalWorkouts.firstWhere(
+              (w) =>
+                  w.title.toLowerCase().contains(apiEx.name.toLowerCase()) ||
+                  apiEx.name.toLowerCase().contains(w.title.toLowerCase()),
             );
-          },
-        );
+          } catch (_) {
+            final resolvedVideoUrl = await apiClient.getWorkoutVideoUrl(
+              apiEx.name,
+            );
+            final resolvedGifUrl = await apiClient.getWorkoutGifUrl(
+              apiEx.name,
+            );
+            matchedExercise = Exercise(
+              id: 'dynamic_${apiEx.name.toLowerCase().replaceAll(' ', '_')}',
+              title: apiEx.name,
+              description: apiEx.notes,
+              targetMuscle: state.splitFocus == 'lower' ? 'legs' : 'chest',
+              thumbnailUrl: '',
+              videoUrl: resolvedVideoUrl,
+              gifUrl: resolvedGifUrl,
+              aiSupported: false,
+            );
+          }
+        }
 
         // Safely parse reps and weight strings into Config List
         final parsedReps = _parseReps(apiEx.reps);
@@ -200,19 +218,18 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
 
         final setsList = List.generate(
           apiEx.sets > 0 ? apiEx.sets : 3,
-          (_) => SetConfig(
-            reps: parsedReps,
-            weight: parsedWeight,
-          ),
+          (_) => SetConfig(reps: parsedReps, weight: parsedWeight),
         );
 
-        exercises.add(RoutineExercise(
-          workoutId: matchedExercise.id,
-          title: matchedExercise.title,
-          targetMuscle: matchedExercise.targetMuscle,
-          sets: setsList,
-          order: i,
-        ));
+        exercises.add(
+          RoutineExercise(
+            workoutId: matchedExercise.id,
+            title: matchedExercise.title,
+            targetMuscle: matchedExercise.targetMuscle,
+            sets: setsList,
+            order: i,
+          ),
+        );
       }
 
       final generatedRoutine = Routine(
@@ -233,7 +250,7 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
     } catch (e, stack) {
       debugPrint('Error generating routine: $e\n$stack');
       state = state.copyWith(
-        isGenerating: false, 
+        isGenerating: false,
         errorMessage: 'Failed to generate AI routine from Next.js server: $e',
       );
       return null;
@@ -243,17 +260,21 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
   Future<void> saveGeneratedRoutine() async {
     final routine = state.generatedRoutine;
     if (routine == null) return;
-    
+
     try {
       await ref.read(userRoutinesProvider.notifier).saveRoutine(routine);
       state = state.copyWith(generatedRoutine: null);
     } catch (e) {
-      state = state.copyWith(errorMessage: 'Failed to save generated routine: $e');
+      state = state.copyWith(
+        errorMessage: 'Failed to save generated routine: $e',
+      );
       rethrow;
     }
   }
 }
 
-final aiPlannerProvider = NotifierProvider<AiPlannerNotifier, AiPlannerState>(() {
-  return AiPlannerNotifier();
-});
+final aiPlannerProvider = NotifierProvider<AiPlannerNotifier, AiPlannerState>(
+  () {
+    return AiPlannerNotifier();
+  },
+);

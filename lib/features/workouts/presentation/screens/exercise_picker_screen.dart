@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise.dart';
 import '../providers/workout_provider.dart';
+import '../widgets/exercise_gif_widget.dart';
 
 class ExercisePickerScreen extends ConsumerStatefulWidget {
   const ExercisePickerScreen({super.key});
@@ -14,6 +16,23 @@ class ExercisePickerScreen extends ConsumerStatefulWidget {
 
 class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
   String _searchQuery = '';
+
+  Future<void> _launchVideo(String urlString) async {
+    if (urlString.isEmpty) return;
+    final Uri url = Uri.parse(urlString);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open video URL: $urlString'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 
   void _showCreateCustomExerciseDialog() {
     final nameController = TextEditingController();
@@ -253,9 +272,16 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
               Expanded(
                 child: filtered.isEmpty
                     ? Center(
-                        child: Text(
-                          'No exercises found.',
-                          style: GoogleFonts.outfit(color: Colors.white30),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                          child: Text(
+                            "No Exercises Found. Tap '+' to create a custom one",
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.outfit(
+                              color: Colors.white30,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       )
                     : ListView.builder(
@@ -282,27 +308,15 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                               onTap: () {
                                 Navigator.pop(context, exercise);
                               },
-                              leading: Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
+                              leading: GestureDetector(
+                                onTap: exercise.videoUrl.isNotEmpty ? () => _launchVideo(exercise.videoUrl) : null,
+                                child: ExerciseGifWidget(
+                                  gifUrl: exercise.gifUrl,
+                                  thumbnailUrl: exercise.thumbnailUrl,
+                                  width: 50,
+                                  height: 50,
                                   borderRadius: BorderRadius.circular(10),
-                                  color: AppTheme.glassFillColor,
-                                  border: Border.all(color: AppTheme.cardBorderColor),
                                 ),
-                                child: exercise.thumbnailUrl.isNotEmpty
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(9),
-                                        child: Image.network(
-                                          exercise.thumbnailUrl,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (c, e, s) => const Icon(
-                                            Icons.fitness_center,
-                                            color: AppTheme.cyberCyan,
-                                          ),
-                                        ),
-                                      )
-                                    : const Icon(Icons.fitness_center, color: AppTheme.cyberCyan),
                               ),
                               title: Row(
                                 children: [
@@ -316,6 +330,19 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                                       ),
                                     ),
                                   ),
+                                  if (exercise.videoUrl.isNotEmpty) ...[
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.play_circle_outline,
+                                        color: AppTheme.cyberCyan,
+                                        size: 22,
+                                      ),
+                                      onPressed: () => _launchVideo(exercise.videoUrl),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
                                   if (exercise.aiSupported)
                                     Container(
                                       margin: const EdgeInsets.only(left: 6),

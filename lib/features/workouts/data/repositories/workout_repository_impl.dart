@@ -16,7 +16,7 @@ class WorkoutRepositoryImpl implements WorkoutRepository {
 
   WorkoutRepositoryImpl(this._client);
 
-  String _getYoutubeGifUrl(String videoUrl) {
+  String _getYoutubeThumbnailUrl(String videoUrl) {
     if (videoUrl.isEmpty) return '';
     try {
       final uri = Uri.tryParse(videoUrl);
@@ -34,8 +34,7 @@ class WorkoutRepositoryImpl implements WorkoutRepository {
       }
 
       if (videoId != null && videoId.isNotEmpty) {
-        // Return YouTube's high-performance animated WebP stream preview
-        return 'https://i.ytimg.com/an_webp/$videoId/mqdefault_6s.webp';
+        return 'https://img.youtube.com/vi/$videoId/hqdefault.jpg';
       }
     } catch (_) {}
     return '';
@@ -53,15 +52,17 @@ class WorkoutRepositoryImpl implements WorkoutRepository {
         final title = item['title'] as String? ?? '';
         final videoUrl = item['videoUrl'] as String? ?? '';
 
-        final formattedName = title.trim().toLowerCase()
-            .replaceAll(RegExp(r'[^a-z0-9\s-]'), '')
-            .replaceAll(RegExp(r'\s+'), '-');
-        final fallbackGifUrl = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/$formattedName/images/0.gif';
+        final formattedName = title.trim()
+            .replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '')
+            .split(RegExp(r'\s+'))
+            .map((word) => word.isEmpty ? '' : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
+            .join('_');
+        final fallbackGifUrl = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/$formattedName/0.jpg';
         
-        final ytGifUrl = _getYoutubeGifUrl(videoUrl);
+        final ytThumbnailUrl = _getYoutubeThumbnailUrl(videoUrl);
         final gifUrl = (item['gifUrl'] as String? ?? '').isNotEmpty
             ? item['gifUrl'] as String
-            : (ytGifUrl.isNotEmpty ? ytGifUrl : fallbackGifUrl);
+            : (ytThumbnailUrl.isNotEmpty ? ytThumbnailUrl : fallbackGifUrl);
 
         final id = _generateIdForTitle(title, i);
 

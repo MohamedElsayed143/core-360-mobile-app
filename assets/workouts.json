@@ -1,0 +1,290 @@
+[
+  {
+    "title": "Barbell Bench Press",
+    "description": "Classic compound chest exercise. Lie flat on bench and press the barbell from chest to full arm extension.",
+    "targetMuscle": "chest",
+    "videoUrl": "https://www.youtube.com/watch?v=vcBig73ojpE",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://static.exercisedb.dev/media/EIeI8Vf.gif"
+  },
+  {
+    "title": "Incline Dumbbell Press",
+    "description": "Upper chest focused press on an inclined bench (30-45°) using dumbbells.",
+    "targetMuscle": "chest",
+    "videoUrl": "https://www.youtube.com/watch?v=8iPEnn-ltC8",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://static.exercisedb.dev/media/PG1kcIb.gif"
+  },
+  {
+    "title": "Cable Chest Fly",
+    "description": "Isolation movement using cables for constant tension across the chest.",
+    "targetMuscle": "chest",
+    "videoUrl": "https://www.youtube.com/shorts/I-Ue34qLxc4",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/w4dLzSx.gif"
+  },
+  {
+    "title": "Push-Ups",
+    "description": "Bodyweight chest exercise. Keep core tight and lower chest to just above the floor.",
+    "targetMuscle": "chest",
+    "videoUrl": "https://www.youtube.com/watch?v=IODxDxX7oi4",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://d205bpvrqc9yn1.cloudfront.net/0662.gif"
+  },
+  {
+    "title": "Decline Bench Press",
+    "description": "Targets the lower chest. Set bench to a decline angle and press barbell.",
+    "targetMuscle": "chest",
+    "videoUrl": "https://www.youtube.com/watch?v=LfyQBUKR8SE",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/DwhEmmE.gif"
+  },
+  {
+    "title": "Pull-Ups",
+    "description": "Compound upper-back exercise. Hang from bar and pull body up until chin clears the bar.",
+    "targetMuscle": "upper_back",
+    "videoUrl": "https://www.youtube.com/watch?v=eGo4IYlbE5g",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://static.exercisedb.dev/media/0V2YQjW.gif"
+  },
+  {
+    "title": "Barbell Row",
+    "description": "Hinge at hips and pull barbell toward lower chest. Major compound back builder.",
+    "targetMuscle": "upper_back",
+    "videoUrl": "https://www.youtube.com/watch?v=G8l_8chR5BE",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://d205bpvrqc9yn1.cloudfront.net/0027.gif"
+  },
+  {
+    "title": "Lat Pulldown",
+    "description": "Cable machine exercise targeting the lats. Pull bar to upper chest while leaning slightly back.",
+    "targetMuscle": "upper_back",
+    "videoUrl": "https://www.youtube.com/watch?v=CAwf7n6Luuc",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/4c9BhzB.gif"
+  },
+  {
+    "title": "Deadlift",
+    "description": "King of all exercises. Pull barbell from floor to hip level with a straight back.",
+    "targetMuscle": "lower_back",
+    "videoUrl": "https://www.youtube.com/watch?v=op9kVnSso6Q",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://static.exercisedb.dev/media/ila4NZS.gif"
+  },
+  {
+    "title": "Face Pulls",
+    "description": "Cable exercise for rear delts and upper traps. Pull rope to face level with elbows high.",
+    "targetMuscle": "trapezius",
+    "videoUrl": "https://www.youtube.com/watch?v=rep-qVOkqgk",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://d205bpvrqc9yn1.cloudfront.net/0337.gif"
+  },
+  {
+    "title": "Overhead Press",
+    "description": "Standing barbell press above the head. Core tight, press from shoulders to full lockout.",
+    "targetMuscle": "front_deltoids",
+    "videoUrl": "https://www.youtube.com/watch?v=2yjwXTZQDDI",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://d205bpvrqc9yn1.cloudfront.net/1012.gif"
+  },
+  {
+    "title": "Lateral Raises",
+    "description": "Dumbbell side raises targeting the medial deltoid. Raise to shoulder height with slight bend.",
+    "targetMuscle": "front_deltoids",
+    "videoUrl": "https://www.youtube.com/watch?v=3VcKaXpzqRo",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/DsgkuIt.gif"
+  },
+  {
+    "title": "Rear Delt Fly",
+    "description": "Bent-over dumbbell raises targeting the rear deltoid and upper back.",
+    "targetMuscle": "back_deltoids",
+    "videoUrl": "https://www.youtube.com/watch?v=EA7u4Q_8HQ0",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/EKXOMEh.gif"
+  },
+  {
+    "title": "Arnold Press",
+    "description": "Rotating dumbbell press that hits all three heads of the deltoid.",
+    "targetMuscle": "front_deltoids",
+    "videoUrl": "https://www.youtube.com/watch?v=6Z15_WdXmVw",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/eOrFCnx.gif"
+  },
+  {
+    "title": "Barbell Curl",
+    "description": "Classic bicep exercise. Curl barbell from hip level to shoulder height.",
+    "targetMuscle": "biceps",
+    "videoUrl": "https://www.youtube.com/watch?v=ykJmrZ5v0Oo",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://static.exercisedb.dev/media/25GPyDY.gif"
+  },
+  {
+    "title": "Hammer Curl",
+    "description": "Neutral grip curl targeting the brachialis and brachioradialis alongside biceps.",
+    "targetMuscle": "biceps",
+    "videoUrl": "https://www.youtube.com/watch?v=zC3nLlEvin4",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/2NpxjC1.gif"
+  },
+  {
+    "title": "Tricep Rope Pushdown",
+    "description": "Cable pushdown with rope attachment targeting the triceps. Keep elbows pinned to sides.",
+    "targetMuscle": "triceps",
+    "videoUrl": "https://www.youtube.com/watch?v=vB5OHsJ3EME",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/gAwDzB3.gif"
+  },
+  {
+    "title": "Skull Crushers",
+    "description": "Lying tricep extension with EZ-bar. Lower bar to forehead level and extend.",
+    "targetMuscle": "triceps",
+    "videoUrl": "https://www.youtube.com/watch?v=NIyoB8WBHBE",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/h8LFzo9.gif"
+  },
+  {
+    "title": "Wrist Curls",
+    "description": "Seated forearm isolation exercise with barbell or dumbbell.",
+    "targetMuscle": "forearm",
+    "videoUrl": null,
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/2dImyQ8.gif"
+  },
+  {
+    "title": "Barbell Back Squat",
+    "description": "Primary leg compound. Bar on upper traps, squat until thighs are parallel to floor.",
+    "targetMuscle": "quadriceps",
+    "videoUrl": "https://www.youtube.com/watch?v=bEv6CCg2BC8",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://static.exercisedb.dev/media/DhMl549.gif"
+  },
+  {
+    "title": "Romanian Deadlift",
+    "description": "Hip-hinge movement targeting the hamstrings. Keep legs mostly straight and bar close to body.",
+    "targetMuscle": "hamstring",
+    "videoUrl": "https://www.youtube.com/watch?v=JCXUYuzwNrM",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://static.exercisedb.dev/media/5eLRITT.gif"
+  },
+  {
+    "title": "Leg Press",
+    "description": "Machine-based quad dominant exercise. Press platform away while keeping back flat.",
+    "targetMuscle": "quadriceps",
+    "videoUrl": "https://www.youtube.com/watch?v=IZxyjW7MPJQ",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/10Z2DXU.gif"
+  },
+  {
+    "title": "Walking Lunges",
+    "description": "Unilateral leg exercise alternating legs. Step forward and lower knee toward ground.",
+    "targetMuscle": "quadriceps",
+    "videoUrl": "https://www.youtube.com/watch?v=L8fvypPrzzs",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://static.exercisedb.dev/media/IZVHb27.gif"
+  },
+  {
+    "title": "Calf Raises",
+    "description": "Standing or seated calf raises targeting the gastrocnemius and soleus.",
+    "targetMuscle": "calves",
+    "videoUrl": "https://www.youtube.com/watch?v=gwLzBJYoWlI",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/8ozhUIZ.gif"
+  },
+  {
+    "title": "Hip Thrust",
+    "description": "Glute-dominant exercise with barbell across hips. Drive hips up to full extension.",
+    "targetMuscle": "gluteal",
+    "videoUrl": "https://www.youtube.com/watch?v=SEdqd1n0cvg",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/qg2PGl6.gif"
+  },
+  {
+    "title": "Leg Curl",
+    "description": "Machine hamstring isolation exercise. Curl heels toward glutes against resistance.",
+    "targetMuscle": "hamstring",
+    "videoUrl": "https://www.youtube.com/watch?v=ELOCsoDSmrg",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/17lJ1kr.gif"
+  },
+  {
+    "title": "Sumo Squat",
+    "description": "Wide-stance squat targeting inner thighs and adductors alongside glutes.",
+    "targetMuscle": "adductor",
+    "videoUrl": null,
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://d205bpvrqc9yn1.cloudfront.net/3142.gif"
+  },
+  {
+    "title": "Plank",
+    "description": "Isometric core hold. Maintain straight body line from head to heels.",
+    "targetMuscle": "abs",
+    "videoUrl": "https://www.youtube.com/watch?v=ASdvN_XEl_c",
+    "thumbnailUrl": null,
+    "aiSupported": true,
+    "gifUrl": "https://d205bpvrqc9yn1.cloudfront.net/3544.gif"
+  },
+  {
+    "title": "Cable Crunch",
+    "description": "Weighted crunch using cable machine. Kneel and crunch elbows toward knees.",
+    "targetMuscle": "abs",
+    "videoUrl": "https://www.youtube.com/watch?v=2fbujeH3F0E",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/WW95auq.gif"
+  },
+  {
+    "title": "Russian Twist",
+    "description": "Rotational core exercise. Sit at 45° and rotate torso side to side with weight.",
+    "targetMuscle": "obliques",
+    "videoUrl": "https://www.youtube.com/watch?v=wkD8rjkodUI",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/fZFZ704.gif"
+  },
+  {
+    "title": "Hanging Leg Raise",
+    "description": "Hang from pull-up bar and raise legs to 90° or higher for lower ab emphasis.",
+    "targetMuscle": "abs",
+    "videoUrl": "https://www.youtube.com/watch?v=Pr1ieGZ5atk",
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/4Ml7QFO.gif"
+  },
+  {
+    "title": "Side Plank",
+    "description": "Lateral isometric hold targeting the obliques and lateral core stability.",
+    "targetMuscle": "obliques",
+    "videoUrl": null,
+    "thumbnailUrl": null,
+    "aiSupported": false,
+    "gifUrl": "https://static.exercisedb.dev/media/5VXmnV5.gif"
+  }
+]

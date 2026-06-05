@@ -36,12 +36,12 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textSub, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white30),
+            icon: const Icon(Icons.refresh, color: AppTheme.textMuted),
             onPressed: () => ref.read(analyticsProvider.notifier).refresh(),
           ),
         ],
@@ -57,7 +57,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.cyberCyan.withOpacity(0.04),
+                color: AppTheme.cyberCyan.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -69,7 +69,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.amethystPurple.withOpacity(0.04),
+                color: AppTheme.amethystPurple.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -129,9 +129,9 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: is7Days ? AppTheme.cyberCyan.withOpacity(0.08) : Colors.transparent,
+                  color: is7Days ? AppTheme.cyberCyan.withValues(alpha: 0.08) : Colors.transparent,
                   border: Border.all(
-                    color: is7Days ? AppTheme.cyberCyan.withOpacity(0.3) : Colors.transparent,
+                    color: is7Days ? AppTheme.cyberCyan.withValues(alpha: 0.3) : Colors.transparent,
                     width: 1.0,
                   ),
                 ),
@@ -140,7 +140,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                   style: GoogleFonts.outfit(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: is7Days ? AppTheme.cyberCyan : Colors.white24,
+                    color: is7Days ? AppTheme.cyberCyan : AppTheme.textMuted,
                   ),
                 ),
               ),
@@ -154,9 +154,9 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: !is7Days ? AppTheme.cyberCyan.withOpacity(0.08) : Colors.transparent,
+                  color: !is7Days ? AppTheme.cyberCyan.withValues(alpha: 0.08) : Colors.transparent,
                   border: Border.all(
-                    color: !is7Days ? AppTheme.cyberCyan.withOpacity(0.3) : Colors.transparent,
+                    color: !is7Days ? AppTheme.cyberCyan.withValues(alpha: 0.3) : Colors.transparent,
                     width: 1.0,
                   ),
                 ),
@@ -165,7 +165,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                   style: GoogleFonts.outfit(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: !is7Days ? AppTheme.cyberCyan : Colors.white24,
+                    color: !is7Days ? AppTheme.cyberCyan : AppTheme.textMuted,
                   ),
                 ),
               ),
@@ -222,7 +222,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
       ),
       child: Column(
@@ -237,11 +237,11 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                 style: GoogleFonts.outfit(
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white30,
+                  color: AppTheme.textMuted,
                   letterSpacing: 1.0,
                 ),
               ),
-              Icon(icon, color: color.withOpacity(0.4), size: 16),
+              Icon(icon, color: color.withValues(alpha: 0.4), size: 16),
             ],
           ),
           Row(
@@ -294,7 +294,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                     style: GoogleFonts.outfit(
                       fontSize: 9,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white30,
+                      color: AppTheme.textMuted,
                       letterSpacing: 1.0,
                     ),
                   ),
@@ -319,7 +319,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                 ? Center(
                     child: Text(
                       'No completed sessions logged.',
-                      style: GoogleFonts.outfit(color: Colors.white24, fontSize: 12),
+                      style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 12),
                     ),
                   )
                 : LineChart(
@@ -342,7 +342,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
         show: true,
         drawVerticalLine: false,
         getDrawingHorizontalLine: (value) => FlLine(
-          color: Colors.white.withOpacity(0.03),
+          color: Colors.white.withValues(alpha: 0.03),
           strokeWidth: 1.0,
         ),
       ),
@@ -371,7 +371,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                 padding: const EdgeInsets.only(top: 6.0),
                 child: Text(
                   formatted,
-                  style: GoogleFonts.outfit(color: Colors.white30, fontSize: 8),
+                  style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 8),
                 ),
               );
             },
@@ -401,8 +401,8 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
             show: true,
             gradient: LinearGradient(
               colors: [
-                AppTheme.cyberCyan.withOpacity(0.12),
-                AppTheme.cyberCyan.withOpacity(0.00),
+                AppTheme.cyberCyan.withValues(alpha: 0.12),
+                AppTheme.cyberCyan.withValues(alpha: 0.00),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -422,7 +422,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
               return LineTooltipItem(
                 '$formatted\n',
                 GoogleFonts.outfit(
-                  color: Colors.white54,
+                  color: AppTheme.textSub,
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
                 ),
@@ -466,7 +466,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                     style: GoogleFonts.outfit(
                       fontSize: 9,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white30,
+                      color: AppTheme.textMuted,
                       letterSpacing: 1.0,
                     ),
                   ),
@@ -491,7 +491,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                 ? Center(
                     child: Text(
                       'No neural pose results compiled.',
-                      style: GoogleFonts.outfit(color: Colors.white24, fontSize: 12),
+                      style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 12),
                     ),
                   )
                 : BarChart(
@@ -521,7 +521,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
               backDrawRodData: BackgroundBarChartRodData(
                 show: true,
                 toY: 100.0,
-                color: Colors.white.withOpacity(0.02),
+                color: Colors.white.withValues(alpha: 0.02),
               ),
             ),
           ],
@@ -547,7 +547,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Text(
                   history[idx].key.toUpperCase(),
-                  style: GoogleFonts.outfit(color: Colors.white30, fontSize: 8, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 8, fontWeight: FontWeight.bold),
                 ),
               );
             },
@@ -564,7 +564,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
             return BarTooltipItem(
               '${history[groupIndex].key.toUpperCase()}\n',
               GoogleFonts.outfit(
-                color: Colors.white54,
+                color: AppTheme.textSub,
                 fontSize: 9,
                 fontWeight: FontWeight.bold,
               ),
@@ -608,7 +608,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                     style: GoogleFonts.outfit(
                       fontSize: 9,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white30,
+                      color: AppTheme.textMuted,
                       letterSpacing: 1.0,
                     ),
                   ),
@@ -642,20 +642,20 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                       _isAnteriorView
                           ? 'assets/images/body_front_blueprint.png'
                           : 'assets/images/body_back_blueprint.png',
-                      color: AppTheme.cyberCyan.withOpacity(0.12),
+                      color: AppTheme.cyberCyan.withValues(alpha: 0.12),
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) {
                         // Fallback vector-like mockup in case image is missing
                         return Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.white10),
+                            border: Border.all(color: AppTheme.textMuted),
                             borderRadius: BorderRadius.circular(16),
-                            color: Colors.black.withOpacity(0.2),
+                            color: Colors.black.withValues(alpha: 0.2),
                           ),
                           child: Icon(
                             Icons.accessibility_new_outlined,
-                            color: AppTheme.cyberCyan.withOpacity(0.35),
+                            color: AppTheme.cyberCyan.withValues(alpha: 0.35),
                             size: 64,
                           ),
                         );
@@ -700,7 +700,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
       height: 32,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
+        color: Colors.black.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -712,14 +712,14 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                color: _isAnteriorView ? AppTheme.cyberCyan.withOpacity(0.08) : Colors.transparent,
+                color: _isAnteriorView ? AppTheme.cyberCyan.withValues(alpha: 0.08) : Colors.transparent,
               ),
               child: Text(
                 'FRONT',
                 style: GoogleFonts.outfit(
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
-                  color: _isAnteriorView ? AppTheme.cyberCyan : Colors.white24,
+                  color: _isAnteriorView ? AppTheme.cyberCyan : AppTheme.textMuted,
                 ),
               ),
             ),
@@ -731,14 +731,14 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                color: !_isAnteriorView ? AppTheme.cyberCyan.withOpacity(0.08) : Colors.transparent,
+                color: !_isAnteriorView ? AppTheme.cyberCyan.withValues(alpha: 0.08) : Colors.transparent,
               ),
               child: Text(
                 'BACK',
                 style: GoogleFonts.outfit(
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
-                  color: !_isAnteriorView ? AppTheme.cyberCyan : Colors.white24,
+                  color: !_isAnteriorView ? AppTheme.cyberCyan : AppTheme.textMuted,
                 ),
               ),
             ),
@@ -770,10 +770,10 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: neonColor.withOpacity(opacity),
+          color: neonColor.withValues(alpha: opacity),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: sets > 0 ? neonColor.withOpacity(opacity + 0.1) : AppTheme.cardBorderColor,
+            color: sets > 0 ? neonColor.withValues(alpha: opacity + 0.1) : AppTheme.cardBorderColor,
             width: 1.0,
           ),
         ),
@@ -785,7 +785,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
               style: GoogleFonts.outfit(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: sets > 0 ? Colors.white : Colors.white24,
+                color: sets > 0 ? Colors.white : AppTheme.textMuted,
               ),
             ),
             Row(
@@ -795,7 +795,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                   style: GoogleFonts.outfit(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: sets > 0 ? neonColor : Colors.white24,
+                    color: sets > 0 ? neonColor : AppTheme.textMuted,
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -803,7 +803,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                   'SETS',
                   style: GoogleFonts.outfit(
                     fontSize: 8,
-                    color: Colors.white24,
+                    color: AppTheme.textMuted,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -825,7 +825,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.darkSurface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: AppTheme.cardBorderColor),
         ),
         title: Row(
@@ -845,7 +845,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('TOTAL SETS:', style: GoogleFonts.outfit(color: Colors.white38, fontSize: 11)),
+                Text('TOTAL SETS:', style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 11)),
                 Text('$sets SETS', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
               ],
             ),
@@ -853,18 +853,18 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('TOTAL VOLUME:', style: GoogleFonts.outfit(color: Colors.white38, fontSize: 11)),
+                Text('TOTAL VOLUME:', style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 11)),
                 Text('${vol.toStringAsFixed(0)} KG', style: GoogleFonts.outfit(color: AppTheme.cyberCyan, fontWeight: FontWeight.bold, fontSize: 12)),
               ],
             ),
             const SizedBox(height: 18),
             Text(
               'TOP EXERCISES LOGGED:',
-              style: GoogleFonts.outfit(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
             ),
             const SizedBox(height: 8),
             exercises.isEmpty
-                ? Text('No exercises logged yet for this group.', style: GoogleFonts.outfit(color: Colors.white24, fontSize: 11))
+                ? Text('No exercises logged yet for this group.', style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 11))
                 : Column(
                     children: exercises.map((e) {
                       return Padding(
@@ -876,7 +876,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                             Expanded(
                               child: Text(
                                 e,
-                                style: GoogleFonts.outfit(color: Colors.white70, fontSize: 11),
+                                style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 11),
                               ),
                             ),
                           ],
@@ -892,7 +892,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
             child: Text(
               'CLOSE',
               style: GoogleFonts.outfit(
-                color: Colors.white30,
+                color: AppTheme.textMuted,
                 fontWeight: FontWeight.bold,
               ),
             ),

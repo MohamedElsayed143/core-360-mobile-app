@@ -1,30 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../domain/entities/user_profile.dart';
-import '../providers/auth_provider.dart';
+import '../../../onboarding/domain/entities/user_profile.dart';
+import '../../../onboarding/presentation/providers/auth_provider.dart';
 
-class OnboardingSurveyScreen extends ConsumerStatefulWidget {
-  const OnboardingSurveyScreen({super.key});
+class EditFitnessProfileScreen extends ConsumerStatefulWidget {
+  final UserProfile profile;
+  const EditFitnessProfileScreen({super.key, required this.profile});
 
   @override
-  ConsumerState<OnboardingSurveyScreen> createState() => _OnboardingSurveyScreenState();
+  ConsumerState<EditFitnessProfileScreen> createState() =>
+      _EditFitnessProfileScreenState();
 }
 
-class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen> {
+class _EditFitnessProfileScreenState
+    extends ConsumerState<EditFitnessProfileScreen> {
   int _currentStep = 1;
   final _step1FormKey = GlobalKey<FormState>();
 
-  final _ageController = TextEditingController();
-  final _heightController = TextEditingController();
-  final _weightController = TextEditingController();
+  late final TextEditingController _ageController;
+  late final TextEditingController _heightController;
+  late final TextEditingController _weightController;
+  late final TextEditingController _bodyFatController;
+  late final TextEditingController _waterPercentageController;
+  late final TextEditingController _muscleMassController;
+  late final TextEditingController _injuriesController;
 
-  final _bodyFatController = TextEditingController();
-  final _waterPercentageController = TextEditingController();
-  final _muscleMassController = TextEditingController();
-
-  final List<String> _selectedGoals = [];
-  final _injuriesController = TextEditingController();
+  late List<String> _selectedGoals;
+  bool _isSaving = false;
 
   final List<String> _availableGoals = [
     'Muscle Gain',
@@ -33,6 +36,23 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
     'Flexibility',
     'Endurance'
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.profile;
+    _ageController = TextEditingController(text: p.age.toString());
+    _heightController = TextEditingController(text: p.height.toString());
+    _weightController = TextEditingController(text: p.weight.toString());
+    _bodyFatController =
+        TextEditingController(text: p.bodyFat?.toString() ?? '');
+    _waterPercentageController =
+        TextEditingController(text: p.waterPercentage?.toString() ?? '');
+    _muscleMassController =
+        TextEditingController(text: p.muscleMass?.toString() ?? '');
+    _injuriesController = TextEditingController(text: p.injuries ?? '');
+    _selectedGoals = List<String>.from(p.goals);
+  }
 
   @override
   void dispose() {
@@ -62,7 +82,7 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
     }
   }
 
-  void _submitSurvey() {
+  Future<void> _save() async {
     if (_selectedGoals.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -77,10 +97,11 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
       return;
     }
 
+    setState(() => _isSaving = true);
+
     final age = int.parse(_ageController.text);
     final height = double.parse(_heightController.text);
     final weight = double.parse(_weightController.text);
-
     final bodyFat = double.tryParse(_bodyFatController.text);
     final waterPercentage = double.tryParse(_waterPercentageController.text);
     final muscleMass = double.tryParse(_muscleMassController.text);
@@ -98,13 +119,30 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
           : _injuriesController.text.trim(),
     );
 
-    ref.read(authProvider.notifier).submitOnboarding(profile);
+    final err = await ref.read(authProvider.notifier).updateFitnessProfile(profile);
+    if (!mounted) return;
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.redAccent,
+          content: Text(err, style: GoogleFonts.outfit(color: Colors.white)),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF22c55e),
+          content: Text('Fitness profile updated.',
+              style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold)),
+        ),
+      );
+      Navigator.pop(context);
+    }
+    setState(() => _isSaving = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -115,164 +153,165 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
           ),
         ),
         child: SafeArea(
-          child: Stack(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Step $_currentStep of 3',
-                          style: GoogleFonts.outfit(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF22c55e),
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _getStepTitle(),
-                          style: GoogleFonts.outfit(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new,
+                          color: Color(0xFFcbd5e1), size: 18),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28.0),
-                    child: Stack(
-                      children: [
-                        Container(
-                          height: 6,
+                    const SizedBox(width: 12),
+                    Text(
+                      'Edit Fitness Profile',
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Step $_currentStep of 3',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF00b4d8),
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _getStepTitle(),
+                      style: GoogleFonts.outfit(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                child: Stack(
+                  children: [
+                    Container(
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF323b49),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: MediaQuery.of(context).size.width *
+                              (_currentStep / 3.0) -
+                          56,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00b4d8),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 36),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                  child: _buildCurrentFormStep(),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(28.0),
+                child: Row(
+                  children: [
+                    if (_currentStep > 1)
+                      Expanded(
+                        child: Container(
+                          height: 48,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF323b49),
-                            borderRadius: BorderRadius.circular(3),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: const Color(0xFF3d4d6b), width: 0.5),
                           ),
-                        ),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          width: (MediaQuery.of(context).size.width * (_currentStep / 3.0)) - 56,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF22c55e),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 28.0),
-                      child: _buildCurrentFormStep(),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(28.0),
-                    child: Row(
-                      children: [
-                        if (_currentStep > 1)
-                          Expanded(
-                            child: Container(
-                              height: 48,
-                              decoration: BoxDecoration(
+                          child: OutlinedButton(
+                            onPressed: _previousStep,
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              side: BorderSide.none,
+                              shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: const Color(0xFF3d4d6b), width: 0.5),
                               ),
-                              child: OutlinedButton(
-                                onPressed: _previousStep,
-                                style: OutlinedButton.styleFrom(
-                                  backgroundColor: Colors.transparent,
-                                  side: BorderSide.none,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: Text(
-                                  'BACK',
-                                  style: GoogleFonts.outfit(
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFFe2e8f0),
-                                  ),
-                                ),
+                            ),
+                            child: Text(
+                              'BACK',
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFFe2e8f0),
                               ),
                             ),
                           ),
-                        if (_currentStep > 1) const SizedBox(width: 16),
-                        Expanded(
-                          child: Container(
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
+                        ),
+                      ),
+                    if (_currentStep > 1) const SizedBox(width: 16),
+                    Expanded(
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00b4d8),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: _currentStep == 3
+                              ? (_isSaving ? null : _save)
+                              : _nextStep,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: ElevatedButton(
-                              onPressed: _currentStep == 3 ? _submitSurvey : _nextStep,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: Text(
-                                _currentStep == 3 ? 'FINISH' : 'NEXT',
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                            ),
                           ),
+                          child: _isSaving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.black))
+                              : Text(
+                                  _currentStep == 3 ? 'SAVE' : 'NEXT',
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (authState is AuthLoading)
-                Container(
-                  color: Colors.black.withOpacity(0.7),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(32),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF252d3a),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF3d4d6b), width: 0.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF22c55e).withOpacity(0.1),
-                            blurRadius: 40,
-                          )
-                        ],
-                      ),
-                      child: const Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF22c55e)),
-                            strokeWidth: 3.5,
-                          ),
-                        ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
+              ),
             ],
           ),
         ),
@@ -313,7 +352,7 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'We require your basic parameters to configure precise load weights and metabolic thresholds.',
+            'Update your basic physical parameters used for load calculations and metabolic thresholds.',
             style: GoogleFonts.outfit(
               color: const Color(0xFF94a3b8),
               fontSize: 14,
@@ -329,13 +368,9 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
             style: GoogleFonts.outfit(color: Colors.white, fontSize: 14),
             decoration: _inputDecoration('e.g. 28'),
             validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Please enter your age';
-              }
+              if (value == null || value.trim().isEmpty) return 'Please enter your age';
               final parsed = int.tryParse(value);
-              if (parsed == null || parsed < 10 || parsed > 120) {
-                return 'Age must be between 10 and 120';
-              }
+              if (parsed == null || parsed < 10 || parsed > 120) return 'Age must be between 10 and 120';
               return null;
             },
           ),
@@ -348,13 +383,9 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
             style: GoogleFonts.outfit(color: Colors.white, fontSize: 14),
             decoration: _inputDecoration('e.g. 178'),
             validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Please enter your height';
-              }
+              if (value == null || value.trim().isEmpty) return 'Please enter your height';
               final parsed = double.tryParse(value);
-              if (parsed == null || parsed < 100 || parsed > 250) {
-                return 'Height must be between 100 and 250 cm';
-              }
+              if (parsed == null || parsed < 100 || parsed > 250) return 'Height must be between 100 and 250 cm';
               return null;
             },
           ),
@@ -367,13 +398,9 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
             style: GoogleFonts.outfit(color: Colors.white, fontSize: 14),
             decoration: _inputDecoration('e.g. 75.5'),
             validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Please enter your weight';
-              }
+              if (value == null || value.trim().isEmpty) return 'Please enter your weight';
               final parsed = double.tryParse(value);
-              if (parsed == null || parsed < 30 || parsed > 300) {
-                return 'Weight must be between 30 and 300 kg';
-              }
+              if (parsed == null || parsed < 30 || parsed > 300) return 'Weight must be between 30 and 300 kg';
               return null;
             },
           ),
@@ -388,7 +415,7 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Enter optional metrics to fine-tune active physical load volumes, or skip forward.',
+          'Update optional metrics for fine-tuned load volumes, or skip forward.',
           style: GoogleFonts.outfit(
             color: const Color(0xFF94a3b8),
             fontSize: 14,
@@ -405,11 +432,11 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
               setState(() => _currentStep = 3);
             },
             icon: const Icon(Icons.fast_forward,
-                color: Color(0xFF22c55e), size: 20),
+                color: Color(0xFF00b4d8), size: 20),
             label: Text(
-              'SKIP ALL METRICS',
+              'CLEAR & SKIP',
               style: GoogleFonts.outfit(
-                color: const Color(0xFF22c55e),
+                color: const Color(0xFF00b4d8),
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
               ),
@@ -453,7 +480,7 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Select your primary target objectives and let us know about any physical injury histories for safer workout planning.',
+          'Update your primary objectives and any injury history for safer workout planning.',
           style: GoogleFonts.outfit(
             color: const Color(0xFF94a3b8),
             fontSize: 14,
@@ -472,7 +499,8 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
               label: Text(
                 goal,
                 style: GoogleFonts.outfit(
-                  color: isSelected ? Colors.black : const Color(0xFFe2e8f0),
+                  color:
+                      isSelected ? Colors.black : const Color(0xFFe2e8f0),
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
                 ),
@@ -510,7 +538,7 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
           maxLines: 4,
           style: GoogleFonts.outfit(color: Colors.white, fontSize: 14),
           decoration: _inputDecoration(
-            'e.g. Left shoulder rotator cuff tear, lumbar spine disk bulge. Leave blank if none.',
+            'e.g. Left shoulder rotator cuff tear. Leave blank if none.',
           ),
         ),
         const SizedBox(height: 20),
@@ -548,7 +576,7 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF22c55e), width: 1),
+        borderSide: BorderSide(color: const Color(0xFF94a3b8), width: 1),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),

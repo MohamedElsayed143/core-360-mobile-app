@@ -31,7 +31,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textSub, size: 18),
           onPressed: () {
             if (plannerState.step > 0 && !plannerState.isGenerating && plannerState.generatedRoutine == null) {
               plannerNotifier.setStep(plannerState.step - 1);
@@ -53,7 +53,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.amethystPurple.withOpacity(0.04),
+                color: AppTheme.amethystPurple.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -86,7 +86,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
                               style: GoogleFonts.outfit(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white54,
+                                color: AppTheme.textSub,
                               ),
                             ),
                           ],
@@ -162,7 +162,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
                       'Filtering injuries & matching global assets...',
                       style: GoogleFonts.outfit(
                         fontSize: 12,
-                        color: Colors.white54,
+                        color: AppTheme.textSub,
                       ),
                     ),
                   ],
@@ -277,7 +277,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
                           style: GoogleFonts.outfit(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: isSel ? Colors.black : Colors.white,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -293,7 +293,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
                 style: GoogleFonts.outfit(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white30,
+                  color: AppTheme.textMuted,
                   letterSpacing: 1.5,
                 ),
               ),
@@ -414,8 +414,8 @@ class AiPlannerWizardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Our RAG engine will merge your active biometrics and goals with these survey split configurations.',
-              style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13, height: 1.4),
+              'Our AI engine will merge your active biometrics and goals with these survey split configurations.',
+              style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 13, height: 1.4),
             ),
             const SizedBox(height: 24),
 
@@ -444,9 +444,9 @@ class AiPlannerWizardScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.orangeAccent.withOpacity(0.04),
+                  color: Colors.orangeAccent.withValues(alpha: 0.04),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.orangeAccent.withOpacity(0.3), width: 1.2),
+                  border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.3), width: 1.2),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -469,7 +469,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
                           const SizedBox(height: 4),
                           Text(
                             'The AI is instructed to bypass exercises straining: "$injuries".',
-                            style: GoogleFonts.outfit(color: Colors.white70, fontSize: 12, height: 1.3),
+                            style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 12, height: 1.3),
                           ),
                         ],
                       ),
@@ -546,7 +546,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: AppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isSelected ? AppTheme.cyberCyan : AppTheme.cardBorderColor,
           width: 1.5,
@@ -554,7 +554,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -581,7 +581,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
                 description,
                 style: GoogleFonts.outfit(
                   fontSize: 13,
-                  color: Colors.white70,
+                  color: AppTheme.textSub,
                   height: 1.4,
                 ),
               ),
@@ -598,7 +598,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
       children: [
         Text(
           label,
-          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white30),
+          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
         ),
         Text(
           value,
@@ -640,7 +640,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
         const SizedBox(height: 12),
         Text(
           'A specialized AI split has been configured. View exercises below before saving.',
-          style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13, height: 1.4),
+          style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 13, height: 1.4),
         ),
         const SizedBox(height: 24),
 
@@ -650,7 +650,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
           decoration: BoxDecoration(
             color: AppTheme.darkSurface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.cyberCyan.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.cyberCyan.withValues(alpha: 0.3)),
           ),
           child: Text(
             routine.name.toUpperCase(),
@@ -716,7 +716,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
                         Text(
                           '${ex.sets.length} Sets • ${ex.sets.map((s) => "${s.reps}x${s.weight.toStringAsFixed(1)}kg").join(', ')}',
                           style: GoogleFonts.outfit(
-                            color: Colors.white54,
+                            color: AppTheme.textSub,
                             fontSize: 11,
                           ),
                         ),
@@ -726,7 +726,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppTheme.cyberCyan.withOpacity(0.06),
+                      color: AppTheme.cyberCyan.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -764,7 +764,7 @@ class AiPlannerWizardScreen extends ConsumerWidget {
                   'RE-GENERATE',
                   style: GoogleFonts.outfit(
                     fontWeight: FontWeight.bold,
-                    color: Colors.white70,
+                    color: AppTheme.textSub,
                   ),
                 ),
               ),

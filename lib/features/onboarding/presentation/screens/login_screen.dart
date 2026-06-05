@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:core_360_app/core/theme/app_theme.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:email_validator/email_validator.dart';
@@ -21,7 +20,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+
   late AnimationController _pulseController;
+  late AnimationController _glowController;
+  late Animation<double> _glowAnimation;
+  late AnimationController _logoController;
 
   // ─── BIOMETRIC STATE ─────────────────────────────────────────────────
   final LocalAuthentication _localAuth = LocalAuthentication();
@@ -31,10 +34,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   bool _canCheckBiometrics = false;
   bool _fingerprintEnabled = false;
   ProviderSubscription<AuthState>? _authSubscription;
-
-  /// Dedicated glow animation controller for the biometric button neon pulse
-  late AnimationController _glowController;
-  late Animation<double> _glowAnimation;
 
   @override
   void initState() {
@@ -52,6 +51,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     _glowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
+
+    _logoController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..forward();
 
     _authSubscription = ref.listenManual<AuthState>(
       authProvider,
@@ -102,16 +106,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     _passwordController.dispose();
     _pulseController.dispose();
     _glowController.dispose();
+    _logoController.dispose();
     super.dispose();
   }
 
   // ─── BIOMETRIC TOKEN DETECTION ───────────────────────────────────────
-  /// Reads from flutter_secure_storage to check if a valid biometric
-  /// credentials token exists on this device, AND verifies the hardware
-  /// actually supports biometrics.
   Future<void> _checkBiometricToken() async {
     try {
-      // 1. Verify device biometric hardware capability
       final canCheck = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
       if (!mounted) return;
@@ -120,13 +121,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       });
       if (!canCheck || !isSupported) return;
 
-      // ─── SECURITY REVIEW: LOCAL PASSWORD STORAGE WARNING ────────────────
-      // NOTE: Storing raw passwords in FlutterSecureStorage is a temporary solution
-      // for offline/local biometric bypass. A secure token/session-based
-      // biometric authentication strategy should be implemented long-term.
-      // ────────────────────────────────────────────────────────────────────
-
-      // 2. Read the cached credentials token from secure storage
       final savedEnabled = await _secureStorage.read(key: 'fingerprint_enabled');
       final email = await _secureStorage.read(key: 'saved_email');
       final password = await _secureStorage.read(key: 'saved_password');
@@ -154,7 +148,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     } catch (e, stack) {
       debugPrint('Error checking biometric token: $e');
       debugPrintStack(stackTrace: stack);
-      // Silently degrade — biometric button simply won't appear
     }
   }
 
@@ -207,7 +200,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       return;
     }
 
-    // ─── VALIDATE EMAIL AND PASSWORD FIRST ──────────────────────────────
     if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
       setState(() {
         _fingerprintEnabled = false;
@@ -226,7 +218,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
               'BIOMETRICS NOT AVAILABLE ON THIS DEVICE.',
               style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
             ),
-            backgroundColor: AppTheme.amethystPurple,
+            backgroundColor: const Color(0xFF22c55e),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -243,19 +235,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
           _fingerprintEnabled = true;
         });
 
-        // ─── SECURITY REVIEW: LOCAL PASSWORD STORAGE WARNING ────────────────
-        // NOTE: Storing raw passwords in FlutterSecureStorage is a temporary solution
-        // for offline/local biometric bypass. A secure token/session-based
-        // biometric authentication strategy should be implemented long-term.
-        // ────────────────────────────────────────────────────────────────────
-        // Save credentials immediately
         final email = _emailController.text;
         final password = _passwordController.text;
         await _secureStorage.write(key: 'saved_email', value: email.trim());
         await _secureStorage.write(key: 'saved_password', value: password);
         await _secureStorage.write(key: 'fingerprint_enabled', value: 'true');
 
-        // Submit the form immediately to log in and open the dashboard
         await _submit();
       } else {
         setState(() {
@@ -282,21 +267,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     }
   }
 
-  // ─── BIOMETRIC AUTHENTICATION HANDLER ────────────────────────────────
-  /// Invokes local_auth to scan face/fingerprint. On success, authenticates
-  /// via the cached secure credentials and routes to Home Dashboard.
   Future<void> _authenticateWithBiometrics() async {
     if (_isBioAuthenticating) return;
 
     try {
-      // Re-read credentials in case storage was cleared since initState
       final enabled = await _secureStorage.read(key: 'fingerprint_enabled');
       final email = await _secureStorage.read(key: 'saved_email');
       final password = await _secureStorage.read(key: 'saved_password');
 
       if (!mounted) return;
 
-      // ── Validate cached credentials are present AND non-blank ──────
       if (enabled != 'true' ||
           email == null ||
           email.trim().isEmpty ||
@@ -304,7 +284,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
           password.trim().isEmpty) {
         _showBiometricSnackBar(
           'BIOMETRIC CREDENTIALS NOT CONFIGURED OR EXPIRED. PLEASE SIGN IN MANUALLY.',
-          AppTheme.amethystPurple,
+          const Color(0xFF22c55e),
         );
         setState(() {
           _hasBiometricToken = false;
@@ -320,9 +300,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       if (!mounted) return;
 
       if (authenticated) {
-        // ── Post-scan re-validation ──────────────────────────────────
-        // Credentials could have been cleared by another screen between
-        // the initial read and the biometric scan completion.
         final postEmail = await _secureStorage.read(key: 'saved_email');
         final postPassword = await _secureStorage.read(key: 'saved_password');
         if (!mounted) return;
@@ -343,7 +320,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
           return;
         }
 
-        // Immediately authenticate via cached credentials
         ref.read(authProvider.notifier).signInWithBiometrics(
           postEmail.trim(),
           postPassword,
@@ -393,7 +369,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       try {
         await ref.read(authProvider.notifier).signIn(email, password);
 
-        // Wait until Firebase auth actually reports an authenticated user.
         bool hasAuthenticated = false;
         for (int attempt = 0; attempt < 20; attempt++) {
           final authState = ref.read(authProvider);
@@ -427,11 +402,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
         final finalState = ref.read(authProvider);
         if (finalState is AuthenticatedWithProfile || finalState is AuthenticatedWithoutProfile) {
           if (_fingerprintEnabled) {
-            // ─── SECURITY REVIEW: LOCAL PASSWORD STORAGE WARNING ────────────────
-            // NOTE: Storing raw passwords in FlutterSecureStorage is a temporary solution
-            // for offline/local biometric bypass. A secure token/session-based
-            // biometric authentication strategy should be implemented long-term.
-            // ────────────────────────────────────────────────────────────────────
             await _secureStorage.write(key: 'saved_email', value: email.trim());
             await _secureStorage.write(key: 'saved_password', value: password);
             await _secureStorage.write(key: 'fingerprint_enabled', value: 'true');
@@ -448,8 +418,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     }
   }
 
-  // ─── BIOMETRIC BUTTON WIDGET ─────────────────────────────────────────
-  /// Premium glowing neon biometric icon button with pulsing ring animation.
   Widget _buildBiometricButton(bool isLoading) {
     return AnimatedBuilder(
       animation: _glowAnimation,
@@ -459,56 +427,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
         return GestureDetector(
           onTap: isLoading ? null : _authenticateWithBiometrics,
           child: Container(
-            width: 56,
-            height: 56,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: AppTheme.darkSurface,
-              borderRadius: BorderRadius.circular(16),
+              color: const Color(0xFF323b49),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: Color.lerp(
-                  AppTheme.cyberCyan.withValues(alpha: 0.5),
-                  AppTheme.cyberCyan,
+                  const Color(0xFF22c55e).withValues(alpha: 0.5),
+                  const Color(0xFF22c55e),
                   glowIntensity,
                 )!,
-                width: 1.5 + (glowIntensity * 0.5),
+                width: 1.0 + (glowIntensity * 0.5),
               ),
               boxShadow: [
-                // Primary neon cyan glow
                 BoxShadow(
-                  color: AppTheme.cyberCyan.withValues(alpha: 0.15 + (glowIntensity * 0.30)),
-                  blurRadius: 14 + (glowIntensity * 10),
-                  spreadRadius: glowIntensity * 3,
-                ),
-                // Secondary purple accent glow
-                BoxShadow(
-                  color: AppTheme.amethystPurple.withValues(alpha: 0.08 + (glowIntensity * 0.12)),
+                  color: const Color(0xFF22c55e).withValues(alpha: 0.15 + (glowIntensity * 0.15)),
                   blurRadius: 10 + (glowIntensity * 6),
-                  spreadRadius: -1,
+                  spreadRadius: glowIntensity * 1,
                 ),
               ],
             ),
             child: _isBioAuthenticating
                 ? const Padding(
-                    padding: EdgeInsets.all(14),
+                    padding: EdgeInsets.all(12),
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.cyberCyan),
-                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF22c55e)),
+                      strokeWidth: 2.0,
                     ),
                   )
-                : ShaderMask(
-                    shaderCallback: (bounds) => LinearGradient(
-                      colors: [
-                        Color.lerp(AppTheme.cyberCyan, Colors.white, glowIntensity * 0.3)!,
-                        Color.lerp(AppTheme.electricBlue, AppTheme.cyberCyan, glowIntensity)!,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ).createShader(bounds),
-                    child: const Icon(
-                      Icons.fingerprint,
-                      color: Colors.white,
-                      size: 28,
-                    ),
+                : Icon(
+                    Icons.fingerprint,
+                    color: Color.lerp(const Color(0xFF22c55e), Colors.white, glowIntensity * 0.3)!,
+                    size: 24,
                   ),
           ),
         );
@@ -520,418 +471,393 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
 
-    // Auth notifier state changes are handled out of build via _authSubscription in initState.
-
     return Scaffold(
-      body: Stack(
-        children: [
-          // ─── AMBIENT BACKGROUND GLOW ─────────────────────────────────────
-          Positioned(
-            top: -150,
-            left: -150,
-            child: AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                return Container(
-                  width: 450,
-                  height: 450,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.amethystPurple.withValues(alpha: 0.12 + (_pulseController.value * 0.05)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.amethystPurple.withValues(alpha: 0.08),
-                        blurRadius: 150,
-                        spreadRadius: 80,
-                      )
-                    ],
-                  ),
-                );
-              },
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF121824), Color(0xFF1a1224)],
           ),
-          Positioned(
-            bottom: -150,
-            right: -150,
-            child: Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.cyberCyan.withValues(alpha: 0.08),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.cyberCyan.withValues(alpha: 0.06),
-                    blurRadius: 180,
-                    spreadRadius: 80,
-                  )
-                ],
-              ),
-            ),
-          ),
-
-          // ─── SCROLLABLE FORM LAYOUT ──────────────────────────────────────
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 28.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 20),
-                      
-                      // ─── PREMIUM CYBER LOGO MARK ───────────────────────────
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppTheme.darkSurface,
-                            border: Border.all(color: AppTheme.cardBorderColor, width: 1.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.cyberCyan.withValues(alpha: 0.12),
-                                blurRadius: 30,
-                                spreadRadius: 2,
-                              )
-                            ],
-                          ),
-                          child: ShaderMask(
-                            shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
-                            child: const Icon(
-                              Icons.all_inclusive,
-                              size: 48,
+        ),
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF252d3a).withValues(alpha: 0.87),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                          color: const Color(0xFF3d4d6b), width: 0.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF1e3a5f).withValues(alpha: 0.25),
+                          blurRadius: 60,
+                          spreadRadius: 8,
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 40),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildLogo(),
+                          const SizedBox(height: 32),
+                          Text(
+                            'Welcome back',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.outfit(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // ─── HEADER TYPOGRAPHY ───────────────────────────────
-                      Center(
-                        child: Text(
-                          'CORE-360',
-                          style: GoogleFonts.outfit(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2.0,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Center(
-                        child: Text(
-                          'NEURAL PERFORMANCE COACHING',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.5,
-                            color: AppTheme.cyberCyan,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 48),
-
-                      // ─── EMAIL INPUT ─────────────────────────────────────
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        style: GoogleFonts.outfit(color: Colors.white),
-                        decoration: const InputDecoration(
-                          labelText: 'Email Address',
-                          prefixIcon: Icon(Icons.mail_outline, color: Colors.white70),
-                          hintText: 'name@example.com',
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Please enter your email';
-                          }
-                          if (!EmailValidator.validate(value.trim())) {
-                            return 'Please enter a valid email address';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-
-                      // ─── PASSWORD INPUT ──────────────────────────────────
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        style: GoogleFonts.outfit(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                              color: Colors.white60,
+                          const SizedBox(height: 32),
+                          Text(
+                            'Email address',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFe2e8f0),
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            style: GoogleFonts.outfit(
+                                color: Colors.white, fontSize: 14),
+                            decoration: _inputDecoration('you@example.com'),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your email';
+                              }
+                              if (!EmailValidator.validate(value.trim())) {
+                                return 'Please enter a valid email address';
+                              }
+                              return null;
                             },
                           ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your password';
-                          }
-                          if (value.length < 6) {
-                            return 'Password must be at least 6 characters';
-                          }
-                          return null;
-                        },
-                      ),
-                      if (_canCheckBiometrics) ...[
-                        const SizedBox(height: 20),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: AppTheme.darkSurface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: _fingerprintEnabled 
-                                  ? AppTheme.cyberCyan.withValues(alpha: 0.8) 
-                                  : AppTheme.cardBorderColor, 
-                              width: 1.5,
+                          const SizedBox(height: 20),
+                          Text(
+                            'Password',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFe2e8f0),
                             ),
-                            boxShadow: [
-                              if (_fingerprintEnabled)
-                                BoxShadow(
-                                  color: AppTheme.cyberCyan.withValues(alpha: 0.15),
-                                  blurRadius: 12,
-                                  spreadRadius: 1,
-                                ),
-                            ],
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            style: GoogleFonts.outfit(
+                                color: Colors.white, fontSize: 14),
+                            decoration: _inputDecoration(
+                              '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  color: const Color(0xFF94a3b8),
+                                ),
+                                onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your password';
+                              }
+                              if (value.length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                          ),
+                          if (_canCheckBiometrics) ...[
+                            const SizedBox(height: 20),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF323b49),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _fingerprintEnabled 
+                                      ? const Color(0xFF22c55e)
+                                      : const Color(0xFF3d4a5e).withValues(alpha: 0.5), 
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  ShaderMask(
-                                    shaderCallback: (bounds) => (_fingerprintEnabled 
-                                            ? AppTheme.primaryGradient 
-                                            : const LinearGradient(colors: [Colors.white54, Colors.white54]))
-                                        .createShader(bounds),
-                                    child: Icon(
-                                      Icons.fingerprint,
-                                      color: _fingerprintEnabled ? Colors.white : Colors.white54,
-                                      size: 26,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                  Row(
                                     children: [
-                                      Text(
-                                        'Enable Fingerprint Quick Login',
-                                        style: GoogleFonts.outfit(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                        ),
+                                      Icon(
+                                        Icons.fingerprint,
+                                        color: _fingerprintEnabled ? const Color(0xFF22c55e) : const Color(0xFF94a3b8),
+                                        size: 24,
                                       ),
-                                      Text(
-                                        'Secure, instant bio-identity setup',
-                                        style: GoogleFonts.outfit(
-                                          color: Colors.white38,
-                                          fontSize: 11,
-                                        ),
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Enable Fingerprint Quick Login',
+                                            style: GoogleFonts.outfit(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Secure, instant bio-identity setup',
+                                            style: GoogleFonts.outfit(
+                                              color: const Color(0xFF94a3b8),
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
-                                ],
-                              ),
-                              Switch(
-                                value: _fingerprintEnabled,
-                                activeThumbColor: AppTheme.cyberCyan,
-                                activeTrackColor: AppTheme.cyberCyan.withValues(alpha: 0.3),
-                                inactiveThumbColor: Colors.white30,
-                                inactiveTrackColor: Colors.black26,
-                                onChanged: _handleFingerprintToggle,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-
-                      // ─── LOGIN SUBMIT CTA & BIOMETRIC BUTTON ROW ────────
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 56,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                gradient: AppTheme.primaryGradient,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppTheme.cyberCyan.withValues(alpha: 0.3),
-                                    blurRadius: 18,
-                                    offset: const Offset(0, 4),
+                                  Switch(
+                                    value: _fingerprintEnabled,
+                                    activeColor: const Color(0xFF22c55e),
+                                    activeTrackColor: const Color(0xFF22c55e).withValues(alpha: 0.3),
+                                    inactiveThumbColor: const Color(0xFF94a3b8),
+                                    inactiveTrackColor: const Color(0xFF1e293b),
+                                    onChanged: _handleFingerprintToggle,
                                   ),
                                 ],
-                              ),
-                              child: ElevatedButton(
-                                onPressed: authState is AuthLoading ? null : _submit,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.transparent,
-                                  shadowColor: Colors.transparent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                child: Text(
-                                  'SIGN IN',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
                               ),
                             ),
-                          ),
-
-                          // ─── GLOWING NEON BIOMETRIC BUTTON ─────────────────
-                          if (_hasBiometricToken && _fingerprintEnabled) ...[
-                            const SizedBox(width: 12),
-                            _buildBiometricButton(authState is AuthLoading),
                           ],
-                        ],
-                      ),
-
-                      // ─── BIOMETRIC HINT LABEL ──────────────────────────────
-                      if (_hasBiometricToken && _fingerprintEnabled) ...[
-                        const SizedBox(height: 14),
-                        Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          const SizedBox(height: 24),
+                          Row(
                             children: [
-                              Container(
-                                width: 28,
-                                height: 1,
-                                color: AppTheme.cardBorderColor,
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                'OR TAP BIOMETRIC',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.6,
-                                  color: AppTheme.cyberCyan.withValues(alpha: 0.6),
+                              Expanded(
+                                child: Container(
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: ElevatedButton(
+                                    onPressed: authState is AuthLoading ? null : _submit,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      shadowColor: Colors.transparent,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Sign In',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 10),
-                              Container(
-                                width: 28,
-                                height: 1,
-                                color: AppTheme.cardBorderColor,
+                              if (_hasBiometricToken && _fingerprintEnabled) ...[
+                                const SizedBox(width: 12),
+                                _buildBiometricButton(authState is AuthLoading),
+                              ],
+                            ],
+                          ),
+                          if (_hasBiometricToken && _fingerprintEnabled) ...[
+                            const SizedBox(height: 14),
+                            Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 28,
+                                    height: 1,
+                                    color: const Color(0xFF3d4a5e).withValues(alpha: 0.5),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'OR TAP BIOMETRIC',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.6,
+                                      color: const Color(0xFF22c55e).withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Container(
+                                    width: 28,
+                                    height: 1,
+                                    color: const Color(0xFF3d4a5e).withValues(alpha: 0.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 24),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Don't have an account? ",
+                                style: GoogleFonts.outfit(
+                                  color: const Color(0xFF94a3b8),
+                                  fontSize: 13,
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => const RegisterScreen()),
+                                  ).then((_) {
+                                    _checkBiometricToken();
+                                  });
+                                },
+                                child: Text(
+                                  'Sign up',
+                                  style: GoogleFonts.outfit(
+                                    color: const Color(0xFFe2e8f0),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-
-                      // ─── SIGN UP REDIRECT LINK ───────────────────────────
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            "New to the arena? ",
-                            style: GoogleFonts.outfit(color: Colors.white60, fontSize: 14),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                PageRouteBuilder(
-                                  pageBuilder: (context, animation, secondaryAnimation) => const RegisterScreen(),
-                                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                    return FadeTransition(
-                                      opacity: animation,
-                                      child: child,
-                                    );
-                                  },
-                                ),
-                              ).then((_) {
-                                _checkBiometricToken();
-                              });
-                            },
-                            child: Text(
-                              "Create Account",
-                              style: GoogleFonts.outfit(
-                                color: AppTheme.cyberCyan,
-                                fontWeight: FontWeight.bold,
-                                decoration: TextDecoration.underline,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-
-          // ─── GLASSMORPHIC ACTION HUD LOADER ──────────────────────────────
-          if (authState is AuthLoading)
-            Container(
-              color: Colors.black.withValues(alpha: 0.7),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: AppTheme.darkSurface,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: AppTheme.cardBorderColor, width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.cyberCyan.withValues(alpha: 0.1),
-                        blurRadius: 40,
-                      )
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.cyberCyan),
-                        strokeWidth: 3.5,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Signing in...',
-                        style: GoogleFonts.outfit(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+            if (authState is AuthLoading)
+              Container(
+                color: Colors.black.withValues(alpha: 0.7),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF252d3a),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF3d4d6b), width: 0.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF22c55e).withValues(alpha: 0.1),
+                          blurRadius: 40,
+                        )
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF22c55e)),
+                          strokeWidth: 3.0,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        Text(
+                          'Signing in...',
+                          style: GoogleFonts.outfit(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String hint, {Widget? suffixIcon}) {
+    return InputDecoration(
+      filled: true,
+      fillColor: const Color(0xFF323b49),
+      hintText: hint,
+      hintStyle:
+          GoogleFonts.outfit(color: const Color(0xFF94a3b8), fontSize: 14),
+      suffixIcon: suffixIcon,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide:
+            BorderSide(color: const Color(0xFF3d4a5e).withValues(alpha: 0.5), width: 0.5),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide:
+            BorderSide(color: const Color(0xFF3d4a5e).withValues(alpha: 0.5), width: 0.5),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFF22c55e), width: 1),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+      ),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Center(
+      child: FadeTransition(
+        opacity: _logoController,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'CORE 360',
+              style: GoogleFonts.jetBrainsMono(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 3,
+                color: Colors.white,
+              ),
             ),
-        ],
+            const SizedBox(height: 2),
+            Text(
+              'AI FORM GUARD™',
+              style: GoogleFonts.jetBrainsMono(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+                color: const Color(0xFF22c55e),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

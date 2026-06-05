@@ -88,7 +88,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
       backgroundColor: AppTheme.darkBackground,
       elevation: 0,
       leading: IconButton(
-        icon: const Icon(Icons.close, color: Colors.white54, size: 22),
+        icon: const Icon(Icons.close, color: AppTheme.textSub, size: 22),
         onPressed: () => _confirmExit(),
       ),
       title: Column(
@@ -107,7 +107,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             '${sessionState.exercises.length} EXERCISES',
             style: GoogleFonts.outfit(
               fontSize: 9,
-              color: Colors.white38,
+              color: AppTheme.textMuted,
               letterSpacing: 0.5,
             ),
           ),
@@ -122,9 +122,9 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.redAccent.withOpacity(0.12),
+                color: Colors.redAccent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
               ),
               child: Text(
                 'END',
@@ -142,10 +142,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
     );
   }
 
-  Widget _buildBody(
-    BuildContext context,
-    ActiveWorkoutState sessionState,
-  ) {
+  Widget _buildBody(BuildContext context, ActiveWorkoutState sessionState) {
     return Stack(
       children: [
         // Ambient glows
@@ -157,7 +154,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             height: 260,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppTheme.electricBlue.withOpacity(0.04),
+              color: AppTheme.electricBlue.withValues(alpha: 0.04),
             ),
           ),
         ),
@@ -169,7 +166,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             height: 200,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppTheme.amethystPurple.withOpacity(0.04),
+              color: AppTheme.amethystPurple.withValues(alpha: 0.04),
             ),
           ),
         ),
@@ -236,9 +233,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(state.exercises.length, (i) {
           final isActive = i == state.activeIndex;
-          final isCompleted = state.exercises[i].sets.every(
-            (s) => s.isCompleted,
-          );
+          final isCompleted = state.exercises[i].sets.every((s) => s.isCompleted);
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -249,8 +244,8 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
               color: isCompleted
                   ? AppTheme.cyberCyan
                   : isActive
-                  ? AppTheme.electricBlue
-                  : AppTheme.cardBorderColor,
+                      ? AppTheme.electricBlue
+                      : AppTheme.cardBorderColor,
             ),
           );
         }),
@@ -265,14 +260,11 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppTheme.electricBlue.withOpacity(0.3),
-          width: 1.2,
-        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.electricBlue.withValues(alpha: 0.3), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.electricBlue.withOpacity(0.04),
+            color: AppTheme.electricBlue.withValues(alpha: 0.04),
             blurRadius: 20,
           ),
         ],
@@ -284,8 +276,8 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppTheme.electricBlue.withOpacity(0.1),
-              border: Border.all(color: AppTheme.electricBlue.withOpacity(0.3)),
+              color: AppTheme.electricBlue.withValues(alpha: 0.1),
+              border: Border.all(color: AppTheme.electricBlue.withValues(alpha: 0.3)),
             ),
             child: Center(
               child: Text(
@@ -315,12 +307,9 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppTheme.cyberCyan.withOpacity(0.08),
+                        color: AppTheme.cyberCyan.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -337,7 +326,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
                       '${ex.sets.where((s) => s.isCompleted).length}/${ex.sets.length} SETS DONE',
                       style: GoogleFonts.outfit(
                         fontSize: 9,
-                        color: Colors.white38,
+                        color: AppTheme.textMuted,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -352,14 +341,14 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.cyberCyan.withOpacity(0.08),
+                  color: Colors.redAccent.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   _isPlayerVisible
                       ? Icons.videocam_outlined
                       : Icons.videocam_off_outlined,
-                  color: AppTheme.cyberCyan,
+                  color: Colors.redAccent,
                   size: 20,
                 ),
               ),
@@ -380,11 +369,8 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
               key: const ValueKey('player_visible'),
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: AppTheme.cyberCyan.withOpacity(0.25),
-                  width: 1.2,
-                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.25), width: 1.2),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -461,57 +447,35 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
           : const SizedBox.shrink(key: ValueKey('player_hidden')),
     );
   }
-
   Widget _buildPlaceholderCapsule() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+      height: 120,
       decoration: BoxDecoration(
         color: AppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppTheme.amethystPurple.withOpacity(0.25),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.amethystPurple.withOpacity(0.04),
-            blurRadius: 20,
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
       ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppTheme.amethystPurple.withOpacity(0.08),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.videocam_off_outlined,
+              color: AppTheme.textMuted,
+              size: 28,
             ),
-            child: const Icon(
-              Icons.fitness_center_rounded,
-              color: AppTheme.amethystPurple,
-              size: 36,
+            const SizedBox(height: 8),
+            Text(
+              'NO MEDIA GUIDE AVAILABLE',
+              style: GoogleFonts.outfit(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textMuted,
+                letterSpacing: 1.0,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'CUSTOM EXERCISE',
-            style: GoogleFonts.outfit(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              letterSpacing: 1.0,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Form Guide Not Required',
-            style: GoogleFonts.outfit(
-              fontSize: 11,
-              color: Colors.white38,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -519,12 +483,11 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
   Widget _buildSetsLedger(ActiveWorkoutState state) {
     final exIndex = state.activeIndex;
     final ex = state.activeExercise;
-    if (ex == null) return const SizedBox();
 
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
       ),
       child: Column(
@@ -546,30 +509,26 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
           const Divider(color: AppTheme.cardBorderColor, height: 1),
 
           // Set Rows
-          ...List.generate(ex.sets.length, (setIndex) {
-            final set = ex.sets[setIndex];
-            return _SetLedgerRow(
-              key: ValueKey('set_${exIndex}_$setIndex'),
-              setNumber: setIndex + 1,
-              weight: set.weight,
-              reps: set.reps,
-              isCompleted: set.isCompleted,
-              onWeightChanged: (v) => ref
-                  .read(activeWorkoutProvider.notifier)
-                  .updateWeight(exIndex, setIndex, v),
-              onRepsChanged: (v) => ref
-                  .read(activeWorkoutProvider.notifier)
-                  .updateReps(exIndex, setIndex, v),
-              onToggleComplete: () => ref
-                  .read(activeWorkoutProvider.notifier)
-                  .toggleSetCompleted(exIndex, setIndex),
-              onDelete: ex.sets.length > 1
-                  ? () => ref
-                        .read(activeWorkoutProvider.notifier)
-                        .deleteSet(exIndex, setIndex)
-                  : null,
-            );
-          }),
+          if (ex != null)
+            ...List.generate(ex.sets.length, (setIndex) {
+              final set = ex.sets[setIndex];
+              return _SetLedgerRow(
+                key: ValueKey('set_${exIndex}_$setIndex'),
+                setNumber: setIndex + 1,
+                weight: set.weight,
+                reps: set.reps,
+                isCompleted: set.isCompleted,
+                onWeightChanged: (v) =>
+                    ref.read(activeWorkoutProvider.notifier).updateWeight(exIndex, setIndex, v),
+                onRepsChanged: (v) =>
+                    ref.read(activeWorkoutProvider.notifier).updateReps(exIndex, setIndex, v),
+                onToggleComplete: () =>
+                    ref.read(activeWorkoutProvider.notifier).toggleSetCompleted(exIndex, setIndex),
+                onDelete: ex.sets.length > 1
+                    ? () => ref.read(activeWorkoutProvider.notifier).deleteSet(exIndex, setIndex)
+                    : null,
+              );
+            }),
         ],
       ),
     );
@@ -584,7 +543,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
         style: GoogleFonts.outfit(
           fontSize: 9,
           fontWeight: FontWeight.bold,
-          color: Colors.white30,
+          color: AppTheme.textMuted,
           letterSpacing: 1.0,
         ),
       ),
@@ -601,25 +560,21 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
           color: AppTheme.darkSurface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: AppTheme.cyberCyan.withOpacity(0.3),
+            color: AppTheme.cyberCyan.withValues(alpha: 0.3),
             width: 1.2,
           ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.add,
-              color: AppTheme.cyberCyan.withOpacity(0.8),
-              size: 18,
-            ),
+            Icon(Icons.add, color: AppTheme.cyberCyan.withValues(alpha: 0.8), size: 18),
             const SizedBox(width: 8),
             Text(
               'ADD SET',
               style: GoogleFonts.outfit(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.cyberCyan.withOpacity(0.8),
+                color: AppTheme.cyberCyan.withValues(alpha: 0.8),
                 letterSpacing: 0.5,
               ),
             ),
@@ -643,35 +598,26 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             Expanded(
               child: GestureDetector(
                 onTap: state.hasPrev
-                    ? () => ref
-                          .read(activeWorkoutProvider.notifier)
-                          .previousExercise()
+                    ? () => ref.read(activeWorkoutProvider.notifier).previousExercise()
                     : null,
                 child: Container(
                   height: 50,
                   decoration: BoxDecoration(
-                    color: state.hasPrev
-                        ? AppTheme.darkSurface
-                        : AppTheme.darkSurface.withOpacity(0.3),
+                    color: state.hasPrev ? AppTheme.darkSurface : AppTheme.darkSurface.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppTheme.cardBorderColor),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.chevron_left,
-                        color: state.hasPrev ? Colors.white70 : Colors.white24,
-                        size: 20,
-                      ),
+                      Icon(Icons.chevron_left,
+                          color: state.hasPrev ? AppTheme.textSub : AppTheme.textMuted, size: 20),
                       Text(
                         'PREV',
                         style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: state.hasPrev
-                              ? Colors.white70
-                              : Colors.white24,
+                          color: state.hasPrev ? AppTheme.textSub : AppTheme.textMuted,
                         ),
                       ),
                     ],
@@ -684,9 +630,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             Expanded(
               child: GestureDetector(
                 onTap: state.hasNext
-                    ? () => ref
-                          .read(activeWorkoutProvider.notifier)
-                          .nextExercise()
+                    ? () => ref.read(activeWorkoutProvider.notifier).nextExercise()
                     : () => _triggerEndWorkout(),
                 child: Container(
                   height: 50,
@@ -694,9 +638,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
                     gradient: state.hasNext ? null : AppTheme.secondaryGradient,
                     borderRadius: BorderRadius.circular(16),
                     border: state.hasNext
-                        ? Border.all(
-                            color: AppTheme.electricBlue.withOpacity(0.4),
-                          )
+                        ? Border.all(color: AppTheme.electricBlue.withValues(alpha: 0.4))
                         : null,
                     color: state.hasNext ? AppTheme.darkSurface : null,
                   ),
@@ -708,14 +650,12 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
                         style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: state.hasNext ? Colors.white70 : Colors.white,
+                          color: state.hasNext ? AppTheme.textSub : Colors.white,
                         ),
                       ),
                       Icon(
-                        state.hasNext
-                            ? Icons.chevron_right
-                            : Icons.emoji_events_outlined,
-                        color: state.hasNext ? Colors.white70 : Colors.white,
+                        state.hasNext ? Icons.chevron_right : Icons.emoji_events_outlined,
+                        color: state.hasNext ? AppTheme.textSub : Colors.white,
                         size: 18,
                       ),
                     ],
@@ -735,7 +675,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.darkSurface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: AppTheme.cardBorderColor),
         ),
         title: Text(
@@ -747,21 +687,14 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
         ),
         content: Text(
           'Save this session and view your performance trophy.',
-          style: GoogleFonts.outfit(
-            color: Colors.white70,
-            fontSize: 13,
-            height: 1.4,
-          ),
+          style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 13, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text(
               'CONTINUE',
-              style: GoogleFonts.outfit(
-                color: Colors.white30,
-                fontWeight: FontWeight.bold,
-              ),
+              style: GoogleFonts.outfit(color: AppTheme.textMuted, fontWeight: FontWeight.bold),
             ),
           ),
           TextButton(
@@ -788,29 +721,23 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.darkSurface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: AppTheme.cardBorderColor),
         ),
         title: Text(
           'DISCARD SESSION?',
-          style: GoogleFonts.outfit(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         content: Text(
           'Any progress in this session will not be saved.',
-          style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13),
+          style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text(
               'STAY',
-              style: GoogleFonts.outfit(
-                color: Colors.white30,
-                fontWeight: FontWeight.bold,
-              ),
+              style: GoogleFonts.outfit(color: AppTheme.textMuted, fontWeight: FontWeight.bold),
             ),
           ),
           TextButton(
@@ -821,10 +748,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
             },
             child: Text(
               'DISCARD',
-              style: GoogleFonts.outfit(
-                color: Colors.redAccent,
-                fontWeight: FontWeight.bold,
-              ),
+              style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -875,7 +799,7 @@ class _TimerHud extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
         color: AppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
       ),
       child: Row(
@@ -889,7 +813,7 @@ class _TimerHud extends ConsumerWidget {
                 style: GoogleFonts.outfit(
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white30,
+                  color: AppTheme.textMuted,
                   letterSpacing: 1.5,
                 ),
               ),
@@ -918,18 +842,18 @@ class _TimerHud extends ConsumerWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isRunning
-                    ? AppTheme.cyberCyan.withOpacity(0.1)
-                    : Colors.white.withOpacity(0.06),
+                    ? AppTheme.cyberCyan.withValues(alpha: 0.1)
+                    : Colors.white.withValues(alpha: 0.06),
                 border: Border.all(
                   color: isRunning
-                      ? AppTheme.cyberCyan.withOpacity(0.5)
+                      ? AppTheme.cyberCyan.withValues(alpha: 0.5)
                       : AppTheme.cardBorderColor,
                   width: 1.5,
                 ),
               ),
               child: Icon(
                 isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: isRunning ? AppTheme.cyberCyan : Colors.white54,
+                color: isRunning ? AppTheme.cyberCyan : AppTheme.textSub,
                 size: 26,
               ),
             ),
@@ -978,8 +902,7 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
   void initState() {
     super.initState();
     _weightCtrl = TextEditingController(
-      text: widget.weight == 0.0 ? '' : widget.weight.toStringAsFixed(1),
-    );
+        text: widget.weight == 0.0 ? '' : widget.weight.toStringAsFixed(1));
     _repsCtrl = TextEditingController(text: widget.reps.toString());
     _weightFocus = FocusNode();
     _repsFocus = FocusNode();
@@ -990,9 +913,8 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
     super.didUpdateWidget(oldWidget);
     // Only update controller if focus isn't active (not being edited)
     if (!_weightFocus.hasFocus) {
-      final newText = widget.weight == 0.0
-          ? ''
-          : widget.weight.toStringAsFixed(1);
+      final newText =
+          widget.weight == 0.0 ? '' : widget.weight.toStringAsFixed(1);
       if (_weightCtrl.text != newText) _weightCtrl.text = newText;
     }
     if (!_repsFocus.hasFocus) {
@@ -1016,7 +938,7 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
         color: widget.isCompleted
-            ? AppTheme.cyberCyan.withOpacity(0.04)
+            ? AppTheme.cyberCyan.withValues(alpha: 0.04)
             : Colors.transparent,
       ),
       child: Padding(
@@ -1034,7 +956,7 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
                     fontWeight: FontWeight.bold,
                     color: widget.isCompleted
                         ? AppTheme.cyberCyan
-                        : Colors.white54,
+                        : AppTheme.textSub,
                   ),
                 ),
               ),
@@ -1048,9 +970,7 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
                 focusNode: _weightFocus,
                 hint: '0.0',
                 suffix: 'kg',
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
@@ -1122,7 +1042,7 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
                       onTap: widget.onDelete,
                       child: const Icon(
                         Icons.delete_outline,
-                        color: Colors.white24,
+                        color: AppTheme.textMuted,
                         size: 18,
                       ),
                     )
@@ -1168,19 +1088,15 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.outfit(color: Colors.white24, fontSize: 12),
+            hintStyle: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 12),
             suffixText: suffix.isNotEmpty ? suffix : null,
-            suffixStyle: GoogleFonts.outfit(
-              color: Colors.white38,
-              fontSize: 10,
-            ),
+            suffixStyle:
+                GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 10),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 6,
-              vertical: 10,
-            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
             isDense: true,
           ),
         ),
@@ -1218,9 +1134,7 @@ class _TrophySheet extends StatelessWidget {
       decoration: const BoxDecoration(
         color: AppTheme.darkSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        border: Border(
-          top: BorderSide(color: AppTheme.cardBorderColor, width: 1),
-        ),
+        border: Border(top: BorderSide(color: AppTheme.cardBorderColor, width: 1)),
       ),
       padding: const EdgeInsets.fromLTRB(28, 24, 28, 40),
       child: SafeArea(
@@ -1241,11 +1155,7 @@ class _TrophySheet extends StatelessWidget {
             // Trophy icon
             ShaderMask(
               shaderCallback: (b) => AppTheme.secondaryGradient.createShader(b),
-              child: const Icon(
-                Icons.emoji_events,
-                color: Colors.white,
-                size: 64,
-              ),
+              child: const Icon(Icons.emoji_events, color: Colors.white, size: 64),
             ),
             const SizedBox(height: 12),
 
@@ -1263,7 +1173,7 @@ class _TrophySheet extends StatelessWidget {
               routineName.toUpperCase(),
               style: GoogleFonts.outfit(
                 fontSize: 11,
-                color: Colors.white38,
+                color: AppTheme.textMuted,
                 letterSpacing: 1.0,
               ),
             ),
@@ -1272,37 +1182,30 @@ class _TrophySheet extends StatelessWidget {
             // Metrics grid
             Row(
               children: [
-                _metricTile(
-                  'DURATION',
-                  durationFormatted,
-                  Icons.timer_outlined,
-                  AppTheme.cyberCyan,
-                ),
+                _metricTile('DURATION', durationFormatted, Icons.timer_outlined,
+                    AppTheme.cyberCyan),
                 const SizedBox(width: 12),
                 _metricTile(
-                  'WEIGHT LIFTED',
-                  '${totalWeightKg.toStringAsFixed(1)} kg',
-                  Icons.fitness_center,
-                  AppTheme.electricBlue,
-                ),
+                    'WEIGHT LIFTED',
+                    '${totalWeightKg.toStringAsFixed(1)} kg',
+                    Icons.fitness_center,
+                    AppTheme.electricBlue),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 _metricTile(
-                  'SETS DONE',
-                  '$completedSets / $totalSets',
-                  Icons.check_circle_outline,
-                  AppTheme.amethystPurple,
-                ),
+                    'SETS DONE',
+                    '$completedSets / $totalSets',
+                    Icons.check_circle_outline,
+                    AppTheme.amethystPurple),
                 const SizedBox(width: 12),
                 _metricTile(
-                  'COMPLETION',
-                  '${pct.toStringAsFixed(0)}%',
-                  Icons.bar_chart,
-                  AppTheme.warningAmber,
-                ),
+                    'COMPLETION',
+                    '${pct.toStringAsFixed(0)}%',
+                    Icons.bar_chart,
+                    AppTheme.warningAmber),
               ],
             ),
             const SizedBox(height: 20),
@@ -1316,7 +1219,7 @@ class _TrophySheet extends StatelessWidget {
                   style: GoogleFonts.outfit(
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white30,
+                    color: AppTheme.textMuted,
                     letterSpacing: 1.2,
                   ),
                 ),
@@ -1331,8 +1234,8 @@ class _TrophySheet extends StatelessWidget {
                       pct >= 80
                           ? AppTheme.cyberCyan
                           : pct >= 50
-                          ? AppTheme.warningAmber
-                          : Colors.redAccent,
+                              ? AppTheme.warningAmber
+                              : Colors.redAccent,
                     ),
                   ),
                 ),
@@ -1382,9 +1285,9 @@ class _TrophySheet extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.06),
+          color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2), width: 1),
+          border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1405,7 +1308,7 @@ class _TrophySheet extends StatelessWidget {
               style: GoogleFonts.outfit(
                 fontSize: 8,
                 fontWeight: FontWeight.bold,
-                color: Colors.white38,
+                color: AppTheme.textMuted,
                 letterSpacing: 0.8,
               ),
             ),

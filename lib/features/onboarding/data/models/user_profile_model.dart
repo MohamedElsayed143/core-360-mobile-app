@@ -11,6 +11,7 @@ class UserProfileModel extends UserProfile {
     super.muscleMass,
     required super.goals,
     super.injuries,
+    super.photoURL,
   });
 
   /// Factory constructor to map from Firestore document snapshot
@@ -25,6 +26,7 @@ class UserProfileModel extends UserProfile {
       muscleMass: (data['muscleMass'] as num?)?.toDouble(),
       goals: List<String>.from(data['goals'] ?? []),
       injuries: data['injuries'] as String?,
+      photoURL: data['photoURL'] as String?,
     );
   }
 
@@ -39,6 +41,7 @@ class UserProfileModel extends UserProfile {
       muscleMass: entity.muscleMass,
       goals: entity.goals,
       injuries: entity.injuries,
+      photoURL: entity.photoURL,
     );
   }
 
@@ -53,6 +56,7 @@ class UserProfileModel extends UserProfile {
       'muscleMass': muscleMass,
       'goals': goals,
       'injuries': injuries,
+      'photoURL': photoURL,
     };
   }
 }

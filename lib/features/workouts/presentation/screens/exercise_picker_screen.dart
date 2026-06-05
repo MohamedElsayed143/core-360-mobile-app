@@ -186,10 +186,10 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                 children: [
                   Text(
                     'Add a custom custom-tailored exercise to your routine database.',
-                    style: GoogleFonts.outfit(color: Colors.white54, fontSize: 11),
+                    style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 11),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Exercise Name Input
                   TextField(
                     controller: nameController,
@@ -200,14 +200,14 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  
+
                   // Target Muscle Dropdown
                   Text(
                     'TARGET MUSCLE',
                     style: GoogleFonts.outfit(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white30,
+                      color: AppTheme.textMuted,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -249,7 +249,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
               TextButton(
                 child: Text(
                   'CANCEL',
-                  style: GoogleFonts.outfit(color: Colors.white30, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.outfit(color: AppTheme.textMuted, fontWeight: FontWeight.bold),
                 ),
                 onPressed: () => Navigator.pop(dialogContext),
               ),
@@ -266,7 +266,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                 onPressed: () {
                   final title = nameController.text.trim();
                   if (title.isEmpty) return;
-                  
+
                   final customExercise = Exercise(
                     id: 'custom_${title.toLowerCase().replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}',
                     title: title,
@@ -276,7 +276,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                     videoUrl: '',
                     aiSupported: false,
                   );
-                  
+
                   Navigator.pop(dialogContext); // pop dialog
                   Navigator.pop(context, customExercise); // pop picker screen returning exercise
                 },
@@ -338,10 +338,10 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                   style: GoogleFonts.outfit(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Search title or target muscle (e.g. chest, abs)...',
-                    prefixIcon: const Icon(Icons.search, color: Colors.white30, size: 20),
+                    prefixIcon: const Icon(Icons.search, color: AppTheme.textMuted, size: 20),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.close, color: Colors.white30, size: 18),
+                            icon: const Icon(Icons.close, color: AppTheme.textMuted, size: 18),
                             onPressed: () {
                               setState(() => _searchQuery = '');
                             },
@@ -400,7 +400,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                             "No Exercises Found. Tap '+' to create a custom one",
                             textAlign: TextAlign.center,
                             style: GoogleFonts.outfit(
-                              color: Colors.white30,
+                              color: AppTheme.textMuted,
                               fontSize: 14,
                             ),
                           ),
@@ -512,7 +512,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                                     overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.outfit(
                                       fontSize: 12,
-                                      color: Colors.white54,
+                                      color: AppTheme.textSub,
                                       height: 1.3,
                                     ),
                                   ),

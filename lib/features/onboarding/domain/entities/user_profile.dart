@@ -7,6 +7,7 @@ class UserProfile {
   final double? muscleMass;
   final List<String> goals;
   final String? injuries;
+  final String? photoURL;
 
   UserProfile({
     required this.age,
@@ -17,5 +18,6 @@ class UserProfile {
     this.muscleMass,
     required this.goals,
     this.injuries,
+    this.photoURL,
   });
 }

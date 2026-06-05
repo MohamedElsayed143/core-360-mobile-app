@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class ProposalExercise {
   final String name;
   final String key;
@@ -11,11 +13,41 @@ class ProposalExercise {
     required this.status,
   });
 
+  /// Returns a human-readable sets description e.g. "3 × 12 reps"
+  String get setsDisplay {
+    final match = RegExp(r'(\d+)x(\d+)').firstMatch(sets);
+    if (match != null) {
+      final count = match.group(1);
+      final reps = match.group(2);
+      return '$count × $reps reps';
+    }
+    try {
+      final parsed = sets as Object;
+      if (parsed is List) {
+        final count = parsed.length;
+        if (parsed.isNotEmpty && parsed[0] is Map) {
+          final reps = parsed[0]['reps'];
+          return '$count × $reps reps';
+        }
+        return '$count sets';
+      }
+    } catch (_) {}
+    return sets;
+  }
+
   factory ProposalExercise.fromJson(Map<String, dynamic> json) {
+    String rawSets;
+    final setsValue = json['sets'];
+    if (setsValue is List) {
+      rawSets = jsonEncode(setsValue);
+    } else {
+      rawSets = (setsValue ?? '').toString();
+    }
+
     return ProposalExercise(
-      name: json['name'] as String? ?? '',
-      key: json['key'] as String? ?? '',
-      sets: (json['sets'] ?? '').toString(),
+      name: (json['name'] ?? json['title'] ?? '') as String,
+      key: (json['key'] ?? json['workoutId'] ?? json['id'] ?? '') as String,
+      sets: rawSets,
       status: json['status'] as String? ?? 'upcoming',
     );
   }

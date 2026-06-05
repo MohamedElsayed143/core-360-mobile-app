@@ -207,7 +207,7 @@ class ErrorScreen extends ConsumerWidget {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.outfit(
                     fontSize: 14,
-                    color: Colors.white70,
+                    color: AppTheme.textSub,
                     height: 1.4,
                   ),
                 ),
@@ -297,7 +297,7 @@ class FirebaseErrorScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.outfit(
                     fontSize: 13,
-                    color: Colors.white70,
+                    color: AppTheme.textSub,
                     height: 1.5,
                   ),
                 ),

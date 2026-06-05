@@ -5,7 +5,7 @@ class Exercise {
   final String targetMuscle;
   final String thumbnailUrl;
   final String videoUrl;
-  final String gifUrl;
+  final String _gifUrl;
   final bool aiSupported;
 
   Exercise({
@@ -15,7 +15,17 @@ class Exercise {
     required this.targetMuscle,
     required this.thumbnailUrl,
     required this.videoUrl,
-    this.gifUrl = '',
+    String gifUrl = '',
     required this.aiSupported,
-  });
+  }) : _gifUrl = gifUrl;
+
+  String get gifUrl {
+    if (_gifUrl.isNotEmpty) return _gifUrl;
+    if (videoUrl.isEmpty) return '';
+    final uri = Uri.tryParse(videoUrl);
+    if (uri == null) return '';
+    final vidId = uri.queryParameters['v'];
+    if (vidId == null || vidId.isEmpty) return '';
+    return 'https://i.ytimg.com/vi/$vidId/hqdefault_anime_webp.gif';
+  }
 }

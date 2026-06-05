@@ -126,7 +126,7 @@ class _ShareImportDialogState extends ConsumerState<ShareImportDialog> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+                    icon: const Icon(Icons.close, color: AppTheme.textSub, size: 20),
                     onPressed: () {
                       ref.read(shareProvider.notifier).clearState();
                       Navigator.pop(context);
@@ -170,7 +170,7 @@ class _ShareImportDialogState extends ConsumerState<ShareImportDialog> {
           Text(
             state.errorMessage!,
             textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(color: Colors.white70),
+            style: GoogleFonts.outfit(color: AppTheme.textSub),
           ),
         ],
       );
@@ -209,9 +209,9 @@ class _ShareImportDialogState extends ConsumerState<ShareImportDialog> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.4),
+              color: Colors.black.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.cyberCyan.withOpacity(0.3)),
+              border: Border.all(color: AppTheme.cyberCyan.withValues(alpha: 0.3)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -238,7 +238,7 @@ class _ShareImportDialogState extends ConsumerState<ShareImportDialog> {
           textAlign: TextAlign.center,
           style: GoogleFonts.outfit(
             fontSize: 12,
-            color: Colors.white54,
+            color: AppTheme.textSub,
           ),
         ),
         const SizedBox(height: 24),
@@ -352,7 +352,7 @@ class _ShareImportDialogState extends ConsumerState<ShareImportDialog> {
         const SizedBox(height: 16),
         Text(
           'EXERCISES TO IMPORT:',
-          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white54),
+          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textSub),
         ),
         const SizedBox(height: 8),
         Container(
@@ -376,7 +376,7 @@ class _ShareImportDialogState extends ConsumerState<ShareImportDialog> {
                 ),
                 subtitle: Text(
                   '${ex.sets.length} Sets • ${ex.targetMuscle.toUpperCase()}',
-                  style: GoogleFonts.outfit(color: Colors.white54, fontSize: 11),
+                  style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 11),
                 ),
               );
             },
@@ -400,7 +400,7 @@ class _ShareImportDialogState extends ConsumerState<ShareImportDialog> {
                 ),
                 child: Text(
                   'BACK',
-                  style: GoogleFonts.outfit(color: Colors.white70, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.outfit(color: AppTheme.textSub, fontWeight: FontWeight.bold),
                 ),
               ),
             ),

@@ -1,15 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Central client manager mapping Cloud Firestore root collections.
 class FirebaseClient {
   final FirebaseAuth auth;
   final FirebaseFirestore firestore;
+  final FirebaseStorage storage;
+
 
   FirebaseClient({
     required this.auth,
     required this.firestore,
+    required this.storage,
   });
 
   // ─── ROOT COLLECTIONS ───────────────────────────────────────────────
@@ -67,11 +71,15 @@ final firebaseAuthProvider = Provider<FirebaseAuth>((ref) => FirebaseAuth.instan
 /// Provider for raw FirebaseFirestore instance
 final firestoreProvider = Provider<FirebaseFirestore>((ref) => FirebaseFirestore.instance);
 
+/// Provider for raw FirebaseStorage instance
+final firebaseStorageProvider = Provider<FirebaseStorage>((ref) => FirebaseStorage.instance);
+
 /// Injectable FirebaseClient singleton mapping collections and auth handles
 final firebaseClientProvider = Provider<FirebaseClient>((ref) {
   final auth = ref.watch(firebaseAuthProvider);
   final firestore = ref.watch(firestoreProvider);
-  return FirebaseClient(auth: auth, firestore: firestore);
+  final storage = ref.watch(firebaseStorageProvider);
+  return FirebaseClient(auth: auth, firestore: firestore, storage: storage);
 });
 
 /// Notifier to bypass Firebase calibration checks for offline simulated test runs.

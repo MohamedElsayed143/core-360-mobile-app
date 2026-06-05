@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -85,7 +86,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   style: GoogleFonts.outfit(
                     fontSize: 8,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white30,
+                    color: AppTheme.textMuted,
                     letterSpacing: 1.0,
                   ),
                 ),
@@ -94,16 +95,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         ),
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Colors.white70,
-            size: 18,
-          ),
+          icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textSub, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.white30),
+            icon: const Icon(Icons.delete_outline, color: AppTheme.textMuted),
             onPressed: () {
               ref.read(chatProvider.notifier).clearChat();
               ScaffoldMessenger.of(context).showSnackBar(
@@ -131,10 +128,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               height: 250,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.cyberCyan.withOpacity(0.03),
+                color: AppTheme.cyberCyan.withValues(alpha: 0.03),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.cyberCyan.withOpacity(0.02),
+                    color: AppTheme.cyberCyan.withValues(alpha: 0.02),
                     blurRadius: 100,
                     spreadRadius: 30,
                   ),
@@ -150,10 +147,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.amethystPurple.withOpacity(0.04),
+                color: AppTheme.amethystPurple.withValues(alpha: 0.04),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.amethystPurple.withOpacity(0.02),
+                    color: AppTheme.amethystPurple.withValues(alpha: 0.02),
                     blurRadius: 120,
                     spreadRadius: 40,
                   ),
@@ -172,10 +169,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     : ListView.builder(
                         controller: _scrollController,
                         physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                         itemCount: chatState.messages.length,
                         itemBuilder: (context, index) {
                           final message = chatState.messages[index];
@@ -205,20 +199,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               decoration: BoxDecoration(
                 color: AppTheme.darkSurface,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppTheme.cyberCyan.withOpacity(0.2),
-                  width: 1.5,
-                ),
+                border: Border.all(color: AppTheme.cyberCyan.withValues(alpha: 0.2), width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.cyberCyan.withOpacity(0.03),
+                    color: AppTheme.cyberCyan.withValues(alpha: 0.03),
                     blurRadius: 30,
                   ),
                 ],
               ),
               child: ShaderMask(
-                shaderCallback: (bounds) =>
-                    AppTheme.primaryGradient.createShader(bounds),
+                shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
                 child: const Icon(
                   Icons.auto_awesome,
                   size: 48,
@@ -243,7 +233,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               textAlign: TextAlign.center,
               style: GoogleFonts.outfit(
                 fontSize: 12,
-                color: Colors.white54,
+                color: AppTheme.textSub,
                 height: 1.5,
               ),
             ),
@@ -284,7 +274,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               prompt,
               style: GoogleFonts.outfit(
                 fontSize: 11,
-                color: AppTheme.cyberCyan.withOpacity(0.8),
+                color: AppTheme.cyberCyan.withValues(alpha: 0.8),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -294,24 +284,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(
-    ChatMessageModel message,
-    List<Exercise> globalWorkouts,
-  ) {
+  Widget _buildMessageBubble(ChatMessageModel message, List<Exercise> globalWorkouts) {
     final isUser = message.role == 'user';
     final hasProposal = message.planProposal != null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
-        crossAxisAlignment: isUser
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
+        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: isUser
-                ? MainAxisAlignment.end
-                : MainAxisAlignment.start,
+            mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!isUser) ...[
@@ -322,17 +305,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   decoration: BoxDecoration(
                     color: AppTheme.darkSurface,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppTheme.cyberCyan.withValues(alpha: 0.3),
-                      width: 1.0,
-                    ),
+                    border: Border.all(color: AppTheme.cyberCyan.withValues(alpha: 0.3), width: 1.0),
                   ),
                   child: const Center(
-                    child: Icon(
-                      Icons.bolt,
-                      color: AppTheme.cyberCyan,
-                      size: 16,
-                    ),
+                    child: Icon(Icons.bolt, color: AppTheme.cyberCyan, size: 16),
                   ),
                 ),
               ],
@@ -340,9 +316,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isUser
-                        ? AppTheme.darkSurface
-                        : AppTheme.darkSurface.withValues(alpha: 0.95),
+                    color: isUser ? AppTheme.darkSurface : AppTheme.darkSurface.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(20),
                       topRight: const Radius.circular(20),
@@ -350,9 +324,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       bottomRight: Radius.circular(isUser ? 4 : 20),
                     ),
                     border: Border.all(
-                      color: isUser
-                          ? AppTheme.cyberCyan.withValues(alpha: 0.3)
-                          : AppTheme.cardBorderColor,
+                      color: isUser ? AppTheme.cyberCyan.withValues(alpha: 0.3) : AppTheme.cardBorderColor,
                       width: 1.2,
                     ),
                   ),
@@ -390,50 +362,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       decoration: BoxDecoration(
                         color: AppTheme.darkSurface,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppTheme.cardBorderColor,
-                          width: 1.0,
-                        ),
+                        border: Border.all(color: AppTheme.cardBorderColor, width: 1.0),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           InkWell(
-                            onTap: () =>
-                                setBubbleState(() => expanded = !expanded),
+                            onTap: () => setBubbleState(() => expanded = !expanded),
                             borderRadius: BorderRadius.circular(16),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                               child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(
-                                        Icons.psychology_outlined,
-                                        color: AppTheme.cyberCyan,
-                                        size: 18,
-                                      ),
+                                      const Icon(Icons.psychology_outlined, color: AppTheme.cyberCyan, size: 18),
                                       const SizedBox(width: 8),
                                       Text(
                                         'AI Coach Thought Process',
                                         style: GoogleFonts.outfit(
                                           fontSize: 12,
-                                          color: Colors.white70,
+                                          color: AppTheme.textSub,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ],
                                   ),
                                   Icon(
-                                    expanded
-                                        ? Icons.keyboard_arrow_up
-                                        : Icons.keyboard_arrow_down,
-                                    color: Colors.white30,
+                                    expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                    color: AppTheme.textMuted,
                                     size: 18,
                                   ),
                                 ],
@@ -447,7 +405,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 message.thinking!,
                                 style: GoogleFonts.outfit(
                                   fontSize: 11,
-                                  color: Colors.white38,
+                                  color: AppTheme.textMuted,
                                   height: 1.4,
                                 ),
                               ),
@@ -455,7 +413,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ],
                       ),
                     );
-                  },
+                  }
                 );
               }(),
             ),
@@ -464,10 +422,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.only(left: 40),
-              child: _buildPlanProposalCard(
-                message.planProposal!,
-                globalWorkouts,
-              ),
+              child: _buildPlanProposalCard(message.planProposal!, globalWorkouts),
             ),
           ],
         ],
@@ -475,22 +430,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildPlanProposalCard(
-    PlanProposalModel proposal,
-    List<Exercise> globalWorkouts,
-  ) {
+  Widget _buildPlanProposalCard(PlanProposalModel proposal, List<Exercise> globalWorkouts) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.darkSurface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: AppTheme.cyberCyan.withOpacity(0.4),
-          width: 1.2,
-        ),
+        border: Border.all(color: AppTheme.cyberCyan.withValues(alpha: 0.4), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.cyberCyan.withOpacity(0.04),
+            color: AppTheme.cyberCyan.withValues(alpha: 0.04),
             blurRadius: 20,
           ),
         ],
@@ -501,13 +450,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Row(
             children: [
               ShaderMask(
-                shaderCallback: (bounds) =>
-                    AppTheme.primaryGradient.createShader(bounds),
-                child: const Icon(
-                  Icons.auto_awesome_outlined,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
+                child: const Icon(Icons.auto_awesome_outlined, color: Colors.white, size: 20),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -528,8 +472,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: proposal.exercises.length,
-            separatorBuilder: (context, index) =>
-                const Divider(color: AppTheme.cardBorderColor, height: 16),
+            separatorBuilder: (context, index) => const Divider(color: AppTheme.cardBorderColor, height: 16),
             itemBuilder: (context, idx) {
               final ex = proposal.exercises[idx];
               final isUpcoming = ex.status == 'upcoming';
@@ -540,20 +483,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     height: 28,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isUpcoming
-                          ? AppTheme.glassFillColor
-                          : AppTheme.cyberCyan.withOpacity(0.08),
+                      color: isUpcoming ? AppTheme.glassFillColor : AppTheme.cyberCyan.withValues(alpha: 0.08),
                       border: Border.all(
-                        color: isUpcoming
-                            ? AppTheme.cardBorderColor
-                            : AppTheme.cyberCyan.withOpacity(0.5),
+                        color: isUpcoming ? AppTheme.cardBorderColor : AppTheme.cyberCyan.withValues(alpha: 0.5),
                         width: 1.0,
                       ),
                     ),
                     child: Center(
                       child: Icon(
                         isUpcoming ? Icons.circle_outlined : Icons.check,
-                        color: isUpcoming ? Colors.white30 : AppTheme.cyberCyan,
+                        color: isUpcoming ? AppTheme.textMuted : AppTheme.cyberCyan,
                         size: 14,
                       ),
                     ),
@@ -573,9 +512,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'Sets config: ${ex.sets}',
+                          ex.setsDisplay,
                           style: GoogleFonts.outfit(
-                            color: Colors.white30,
+                            color: AppTheme.textMuted,
                             fontSize: 10,
                           ),
                         ),
@@ -583,14 +522,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isUpcoming
-                          ? AppTheme.glassFillColor
-                          : AppTheme.cyberCyan.withOpacity(0.06),
+                      color: isUpcoming ? AppTheme.glassFillColor : AppTheme.cyberCyan.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -598,7 +532,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       style: GoogleFonts.outfit(
                         fontSize: 8,
                         fontWeight: FontWeight.bold,
-                        color: isUpcoming ? Colors.white54 : AppTheme.cyberCyan,
+                        color: isUpcoming ? AppTheme.textSub : AppTheme.cyberCyan,
                       ),
                     ),
                   ),
@@ -628,11 +562,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.add_box_outlined,
-                      color: Colors.black,
-                      size: 18,
-                    ),
+                    const Icon(Icons.add_box_outlined, color: Colors.black, size: 18),
                     const SizedBox(width: 8),
                     Text(
                       'IMPORT TO ROUTINES',
@@ -682,20 +612,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         );
 
         int numSets = 3;
-        final setMatch = RegExp(r'(\d+)x').firstMatch(e.sets);
-        if (setMatch != null) {
-          numSets = int.tryParse(setMatch.group(1)!) ?? 3;
-        } else {
-          final setMatch2 = RegExp(r'(\d+)').firstMatch(e.sets);
-          if (setMatch2 != null) {
-            numSets = int.tryParse(setMatch2.group(1)!) ?? 3;
-          }
-        }
-
         int reps = 10;
-        final repsMatch = RegExp(r'x(\d+)').firstMatch(e.sets);
-        if (repsMatch != null) {
-          reps = int.tryParse(repsMatch.group(1)!) ?? 10;
+
+        try {
+          final parsedSets = jsonDecode(e.sets) as List;
+          if (parsedSets.isNotEmpty) {
+            numSets = parsedSets.length;
+            if (parsedSets[0] is Map) {
+              reps = (parsedSets[0]['reps'] ?? 10) as int;
+            }
+          }
+        } catch (_) {
+          final setMatch = RegExp(r'(\d+)x').firstMatch(e.sets);
+          if (setMatch != null) {
+            numSets = int.tryParse(setMatch.group(1)!) ?? 3;
+            final repsMatch = RegExp(r'x(\d+)').firstMatch(e.sets);
+            reps = repsMatch != null ? int.tryParse(repsMatch.group(1)!) ?? 10 : 10;
+          } else {
+            final setMatch2 = RegExp(r'(\d+)').firstMatch(e.sets);
+            if (setMatch2 != null) {
+              numSets = int.tryParse(setMatch2.group(1)!) ?? 3;
+            }
+          }
         }
 
         exercises.add(
@@ -755,7 +693,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       decoration: BoxDecoration(
         color: AppTheme.darkBackground,
         border: const Border(
-          top: BorderSide(color: AppTheme.cardBorderColor, width: 1.0),
+          top: BorderSide(
+            color: AppTheme.cardBorderColor,
+            width: 1.0,
+          ),
         ),
       ),
       child: SafeArea(
@@ -766,10 +707,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 decoration: BoxDecoration(
                   color: AppTheme.darkSurface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppTheme.cardBorderColor,
-                    width: 1.2,
-                  ),
+                  border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
                 ),
                 child: Row(
                   children: [
@@ -778,24 +716,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       child: TextField(
                         controller: _messageController,
                         textCapitalization: TextCapitalization.sentences,
-                        style: GoogleFonts.outfit(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
+                        style: GoogleFonts.outfit(color: Colors.white, fontSize: 14),
                         decoration: InputDecoration(
-                          hintText: chatState.isStreaming
-                              ? 'Coach is compiling response...'
+                          hintText: chatState.isStreaming 
+                              ? 'Coach is compiling response...' 
                               : 'Ask RAG Coach anything...',
-                          hintStyle: GoogleFonts.outfit(
-                            color: Colors.white30,
-                            fontSize: 13,
-                          ),
+                          hintStyle: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 13),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                          ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
                           filled: false,
                         ),
                         onSubmitted: (_) => _sendMessage(),
@@ -812,17 +742,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  gradient: chatState.isStreaming
-                      ? null
-                      : AppTheme.primaryGradient,
-                  color: chatState.isStreaming
-                      ? AppTheme.cardBorderColor
-                      : null,
+                  gradient: chatState.isStreaming ? null : AppTheme.primaryGradient,
+                  color: chatState.isStreaming ? AppTheme.cardBorderColor : null,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     if (!chatState.isStreaming)
                       BoxShadow(
-                        color: AppTheme.cyberCyan.withOpacity(0.2),
+                        color: AppTheme.cyberCyan.withValues(alpha: 0.2),
                         blurRadius: 10,
                         spreadRadius: 1,
                       ),
@@ -834,7 +760,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
-                            color: Colors.white54,
+                            color: AppTheme.textSub,
                             strokeWidth: 2.0,
                           ),
                         )

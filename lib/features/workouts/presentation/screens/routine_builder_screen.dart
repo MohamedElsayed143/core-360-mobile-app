@@ -247,7 +247,7 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textSub, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -297,7 +297,7 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.0,
-                          color: Colors.white54,
+                          color: AppTheme.textSub,
                         ),
                       ),
                       TextButton.icon(
@@ -323,11 +323,11 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.fitness_center_outlined, color: Colors.white24, size: 48),
+                              const Icon(Icons.fitness_center_outlined, color: AppTheme.textMuted, size: 48),
                               const SizedBox(height: 16),
                               Text(
                                 'NO EXERCISES ADDED YET.',
-                                style: GoogleFonts.outfit(color: Colors.white30, fontSize: 13),
+                                style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 13),
                               ),
                               const SizedBox(height: 16),
                               ElevatedButton(
@@ -348,7 +348,7 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
                             ],
                           ),
                         )
-                       : ListView.builder(
+                      : ListView.builder(
                           physics: const BouncingScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                           itemCount: _exercises.length,
@@ -396,7 +396,7 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
       margin: const EdgeInsets.only(bottom: 18),
       decoration: BoxDecoration(
         color: AppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
       ),
       child: Column(
@@ -484,14 +484,14 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
                 
                 // Reorder up
                 IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_up, color: Colors.white38, size: 20),
+                  icon: const Icon(Icons.keyboard_arrow_up, color: AppTheme.textMuted, size: 20),
                   onPressed: exIdx > 0 ? () => _moveExerciseUp(exIdx) : null,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
                 // Reorder down
                 IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white38, size: 20),
+                  icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.textMuted, size: 20),
                   onPressed: exIdx < _exercises.length - 1 ? () => _moveExerciseDown(exIdx) : null,
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   constraints: const BoxConstraints(),
@@ -524,7 +524,7 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
             child: OutlinedButton.icon(
               onPressed: () => _addSet(exIdx),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white70,
+                foregroundColor: AppTheme.textSub,
                 side: const BorderSide(color: AppTheme.cardBorderColor),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -555,7 +555,7 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
               style: GoogleFonts.outfit(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: Colors.white38,
+                color: AppTheme.textMuted,
               ),
             ),
           ),
@@ -566,7 +566,7 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.remove_circle_outline, color: Colors.white30, size: 18),
+                  icon: const Icon(Icons.remove_circle_outline, color: AppTheme.textMuted, size: 18),
                   onPressed: () => _updateSetReps(exIdx, setIdx, -1),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -591,7 +591,7 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
                 const SizedBox(width: 4),
                 Text(
                   'REPS',
-                  style: GoogleFonts.outfit(fontSize: 9, color: Colors.white30, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.outfit(fontSize: 9, color: AppTheme.textMuted, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -603,7 +603,7 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.remove_circle_outline, color: Colors.white30, size: 18),
+                  icon: const Icon(Icons.remove_circle_outline, color: AppTheme.textMuted, size: 18),
                   onPressed: () => _updateSetWeight(exIdx, setIdx, -2.5),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -628,7 +628,7 @@ class _RoutineBuilderScreenState extends ConsumerState<RoutineBuilderScreen> {
                 const SizedBox(width: 4),
                 Text(
                   'KG',
-                  style: GoogleFonts.outfit(fontSize: 9, color: Colors.white30, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.outfit(fontSize: 9, color: AppTheme.textMuted, fontWeight: FontWeight.bold),
                 ),
               ],
             ),

@@ -16,7 +16,6 @@ class ApiClient {
   // Cache for workouts fetched from backend
   Map<String, WorkoutData>? _workoutsCache;
   bool _isFetchingWorkouts = false;
-
   ApiClient({Dio? dio}) : _dio = dio ?? Dio() {
     _dio.options.baseUrl = ApiConstants.baseUrl;
     _dio.options.connectTimeout = const Duration(seconds: 8);
@@ -200,7 +199,6 @@ class ApiClient {
     }
     return null;
   }
-
   /// Personalized AI Workout Planner (POST /api/ai-workout)
   Future<AiWorkoutResponse> generateAiWorkout(AiWorkoutRequest request) async {
     try {
@@ -364,6 +362,30 @@ class ApiClient {
     }
   }
 
+  /// Global Dynamic YouTube Video Tutorial Resolver for Sandbox & Fallback imports
+  static String resolveWorkoutVideoUrl(String title) {
+    final lower = title.toLowerCase();
+    if (lower.contains('bench press')) {
+      return 'https://www.youtube.com/watch?v=rT7DgCr-3pg';
+    } else if (lower.contains('push-up') || lower.contains('push up')) {
+      return 'https://www.youtube.com/watch?v=IODxDxX7oi4';
+    } else if (lower.contains('tricep extension') || lower.contains('tricep')) {
+      return 'https://www.youtube.com/watch?v=X-iV-sGEL1s';
+    } else if (lower.contains('squat')) {
+      return 'https://www.youtube.com/watch?v=aclHkVaku9U';
+    } else if (lower.contains('calf raise') || lower.contains('calf')) {
+      return 'https://www.youtube.com/watch?v=YM21oT-Vyc4';
+    } else if (lower.contains('pull-up') || lower.contains('pull up') || lower.contains('lat')) {
+      return 'https://www.youtube.com/watch?v=eGo4IYlbE5g';
+    } else if (lower.contains('plank')) {
+      return 'https://www.youtube.com/watch?v=B296mZDhrWY';
+    } else if (lower.contains('deadlift')) {
+      return 'https://www.youtube.com/watch?v=XowK9_K25VA';
+    }
+    // Generic backup workout tutorial
+    return 'https://www.youtube.com/watch?v=aclHkVaku9U';
+  }
+
   /// High-fidelity local AI workout plan generator fallback (now uses corrected video URLs)
   AiWorkoutResponse _generateSimulatedWorkoutResponse(
     AiWorkoutRequest request,
@@ -435,9 +457,7 @@ class ApiClient {
           notes: 'Secondary compound pull support core lock.',
         ),
       ];
-    } else if (lowerFocus.contains('leg') ||
-        lowerFocus.contains('lower') ||
-        lowerFocus.contains('quad')) {
+    } else if (lowerFocus.contains('leg') || lowerFocus.contains('lower') || lowerFocus.contains('quad')) {
       routineName = 'Neural Lower Body Optimizer';
       exercises = [
         AiWorkoutExercise(
@@ -446,8 +466,7 @@ class ApiClient {
           reps: '12 reps',
           weightKg: 'Bodyweight',
           rest: '90s',
-          notes:
-              'Sit deep. Keep back straight and check hip flexion on pose analyzer.',
+          notes: 'Sit deep. Keep back straight and check hip flexion on pose analyzer.',
         ),
         AiWorkoutExercise(
           name: 'Standing Calf Raise',
@@ -546,6 +565,14 @@ class ApiClient {
             '        {"reps": 10, "kg": 0.0}\n'
             '      ],\n'
             '      "order": 1\n'
+            '    },\n'
+            '    {\n'
+            '      "workoutId": "plank_005",\n'
+            '      "title": "Forearm Plank",\n'
+            '      "sets": [\n'
+            '        {"reps": 1, "kg": 0.0}\n'
+            '      ],\n'
+            '      "order": 2\n'
             '    }\n'
             '  ]\n'
             '}\n'
@@ -572,6 +599,7 @@ class ApiClient {
             '      "title": "Bodyweight Squat",\n'
             '      "sets": [\n'
             '        {"reps": 12, "kg": 0.0},\n'
+            '        {"reps": 12, "kg": 0.0},\n'
             '        {"reps": 12, "kg": 0.0}\n'
             '      ],\n'
             '      "order": 0\n'
@@ -584,14 +612,21 @@ class ApiClient {
             '        {"reps": 12, "kg": 0.0}\n'
             '      ],\n'
             '      "order": 1\n'
+            '    },\n'
+            '    {\n'
+            '      "workoutId": "plank_005",\n'
+            '      "title": "Forearm Plank",\n'
+            '      "sets": [\n'
+            '        {"reps": 1, "kg": 0.0}\n'
+            '      ],\n'
+            '      "order": 2\n'
             '    }\n'
             '  ]\n'
             '}\n'
             '[/PLAN_PROPOSAL]\n\n'
-            'Tap the card above to immediately import this routine into your personal library!';
+            'You can tap the card above to immediately import this routine into your personal library and launch it with live computer vision joint flexion warnings!';
       } else {
-        responseText =
-            'Hello! I am your Core-360 AI performance coach. 🌌 Regarding your prompt: "$userPrompt".\n\nWith your goals ($goals), body stats ($weight kg), and $completedSessions successfully completed sessions, I recommend keeping high focus on control. Let me know if you want to generate a custom training routine!';
+        responseText = 'Welcome to Core-360 Neural Coaching! 🌌 I am your dedicated AI fitness companion.\n\nAsk me anything about proper joint alignment, squat depth calculations, or request a custom workout split tailored to bypass physical limits!';
       }
     }
 
@@ -636,7 +671,6 @@ class ApiClient {
     String? apiKey,
   }) async {
     final key = apiKey ?? const String.fromEnvironment('GROQ_API_KEY');
-
     if (key.isEmpty || key == 'MOCK_MODE') {
       debugPrint('Groq API Key is empty. Falling back to local AI Simulator.');
       return _generateSimulatedResponse(userPrompt);
@@ -683,7 +717,6 @@ class ApiClient {
     List<Map<String, dynamic>> selectedExercises = [];
 
     final lowerPrompt = userPrompt.toLowerCase();
-
     if (lowerPrompt.contains('lower') ||
         lowerPrompt.contains('quadriceps') ||
         lowerPrompt.contains('lower body')) {
@@ -836,4 +869,5 @@ class StreamMappingHelper {
 }
 
 // ─── RIVERPOD PROVIDER ──────────────────────────────────────────────
+
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());

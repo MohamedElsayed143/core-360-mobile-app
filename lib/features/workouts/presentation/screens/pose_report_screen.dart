@@ -47,7 +47,7 @@ class PoseReportScreen extends ConsumerWidget {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: mainColor.withOpacity(0.04),
+                color: mainColor.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -59,7 +59,7 @@ class PoseReportScreen extends ConsumerWidget {
               height: 250,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.amethystPurple.withOpacity(0.03),
+                color: AppTheme.amethystPurple.withValues(alpha: 0.03),
               ),
             ),
           ),
@@ -126,7 +126,7 @@ class PoseReportScreen extends ConsumerWidget {
                             shape: BoxShape.circle,
                             color: Colors.transparent,
                             border: Border.all(
-                              color: mainColor.withOpacity(0.05),
+                              color: mainColor.withValues(alpha: 0.05),
                               width: 12,
                             ),
                           ),
@@ -162,7 +162,7 @@ class PoseReportScreen extends ConsumerWidget {
                               style: GoogleFonts.outfit(
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white30,
+                                color: AppTheme.textMuted,
                                 letterSpacing: 1.0,
                               ),
                             ),
@@ -200,7 +200,7 @@ class PoseReportScreen extends ConsumerWidget {
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: AppTheme.darkSurface,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
                     ),
                     child: Column(
@@ -214,16 +214,16 @@ class PoseReportScreen extends ConsumerWidget {
                               style: GoogleFonts.outfit(
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white30,
+                                color: AppTheme.textMuted,
                                 letterSpacing: 1.0,
                               ),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: riskColor.withOpacity(0.08),
+                                color: riskColor.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: riskColor.withOpacity(0.4)),
+                                border: Border.all(color: riskColor.withValues(alpha: 0.4)),
                               ),
                               child: Text(
                                 riskText,
@@ -241,7 +241,7 @@ class PoseReportScreen extends ConsumerWidget {
                           riskDescription,
                           style: GoogleFonts.outfit(
                             fontSize: 12,
-                            color: Colors.white70,
+                            color: AppTheme.textSub,
                             height: 1.4,
                           ),
                         ),
@@ -254,7 +254,7 @@ class PoseReportScreen extends ConsumerWidget {
                   Container(
                     decoration: BoxDecoration(
                       color: AppTheme.darkSurface,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
                     ),
                     child: Column(
@@ -267,7 +267,7 @@ class PoseReportScreen extends ConsumerWidget {
                             style: GoogleFonts.outfit(
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white30,
+                              color: AppTheme.textMuted,
                               letterSpacing: 1.0,
                             ),
                           ),
@@ -278,7 +278,7 @@ class PoseReportScreen extends ConsumerWidget {
                             padding: const EdgeInsets.all(20),
                             child: Text(
                               'No joint metrics logged. Stand fully in frame.',
-                              style: GoogleFonts.outfit(color: Colors.white38, fontSize: 11),
+                              style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 11),
                             ),
                           )
                         else
@@ -348,7 +348,7 @@ class PoseReportScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white24, size: 22),
+          Icon(icon, color: AppTheme.textMuted, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -358,7 +358,7 @@ class PoseReportScreen extends ConsumerWidget {
                   label,
                   style: GoogleFonts.outfit(
                     fontSize: 8,
-                    color: Colors.white30,
+                    color: AppTheme.textMuted,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
                   ),
@@ -399,15 +399,15 @@ class PoseReportScreen extends ConsumerWidget {
             style: GoogleFonts.outfit(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: Colors.white70,
+              color: AppTheme.textSub,
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: badgeColor.withOpacity(0.06),
+              color: badgeColor.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: badgeColor.withOpacity(0.3)),
+              border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
             ),
             child: Text(
               status,
@@ -446,8 +446,8 @@ class PoseReportScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2), width: 1.2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -480,7 +480,7 @@ class PoseReportScreen extends ConsumerWidget {
                       tip,
                       style: GoogleFonts.outfit(
                         fontSize: 12,
-                        color: Colors.white70,
+                        color: AppTheme.textSub,
                         height: 1.3,
                       ),
                     ),

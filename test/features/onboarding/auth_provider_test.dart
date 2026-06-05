@@ -224,7 +224,6 @@ void main() {
       final finalState = container.read(authProvider) as AuthenticatedWithProfile;
       expect(finalState.profile.goals.first, 'Flexibility');
     });
-
     test('signUp with fingerprintEnabled = true registers, saves to secure storage, and signs out', () async {
       FlutterSecureStorage.setMockInitialValues({});
       final notifier = container.read(authProvider.notifier);

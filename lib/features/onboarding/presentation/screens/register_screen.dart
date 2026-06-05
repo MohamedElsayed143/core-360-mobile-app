@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:core_360_app/core/theme/app_theme.dart';
-import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:email_validator/email_validator.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -14,16 +14,15 @@ class RegisterScreen extends ConsumerStatefulWidget {
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTickerProviderStateMixin {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  late AnimationController _pulseController;
 
   final LocalAuthentication _localAuth = LocalAuthentication();
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
@@ -33,10 +32,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat(reverse: true);
     _checkBiometrics();
   }
 
@@ -95,7 +90,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
               'BIOMETRICS NOT AVAILABLE ON THIS DEVICE.',
               style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
             ),
-            backgroundColor: AppTheme.amethystPurple,
+            backgroundColor: const Color(0xFF22c55e),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -105,9 +100,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
         return;
       }
 
-      // ── DUPLICATE BIOMETRIC IDENTITY PRE-CHECK ──────────────────────
-      // If biometric credentials are already bound to an account on this device,
-      // fail with an error and reject the enrollment.
       final existingEnabled = await _secureStorage.read(key: 'fingerprint_enabled');
       if (!mounted) return;
 
@@ -140,7 +132,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
               'BIOMETRIC SCAN SUCCEEDED. FINGERPRINT ENROLLED FOR SIGN-UP.',
               style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.black),
             ),
-            backgroundColor: AppTheme.cyberCyan,
+            backgroundColor: const Color(0xFF22c55e),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -167,22 +159,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
     }
   }
 
-  // Conflict dialog is deprecated as overrides are no longer permitted.
-
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _pulseController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Double check if fingerprint is enabled but already registered
     final existingEnabled = await _secureStorage.read(key: 'fingerprint_enabled');
     if (_fingerprintEnabled && existingEnabled == 'true') {
       if (!mounted) return;
@@ -220,7 +208,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
             'ACCOUNT CREATED SUCCESSFULLY! PLEASE SIGN IN.',
             style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.black),
           ),
-          backgroundColor: AppTheme.cyberCyan,
+          backgroundColor: const Color(0xFF22c55e),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -232,7 +220,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
 
-    // If an error is caught, show a custom snackbar once and clear it
     ref.listen(authProvider, (previous, next) {
       if (next is AuthError) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -247,7 +234,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                 Expanded(
                   child: Text(
                     next.message,
-                    style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500),
+                    style: GoogleFonts.outfit(
+                        color: Colors.white, fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
@@ -255,9 +243,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
             action: SnackBarAction(
               label: 'DISMISS',
               textColor: Colors.white,
-              onPressed: () {
-                ref.read(authProvider.notifier).clearError();
-              },
+              onPressed: () => ref.read(authProvider.notifier).clearError(),
             ),
           ),
         );
@@ -265,100 +251,77 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
     });
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // ─── AMBIENT BACKGROUND GLOW ─────────────────────────────────────
-          Positioned(
-            top: -150,
-            right: -150,
-            child: AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                return Container(
-                  width: 450,
-                  height: 450,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.cyberCyan.withValues(alpha: 0.08 + (_pulseController.value * 0.04)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.cyberCyan.withValues(alpha: 0.06),
-                        blurRadius: 160,
-                        spreadRadius: 80,
-                      )
-                    ],
-                  ),
-                );
-              },
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF121824), Color(0xFF1a1224)],
           ),
-          Positioned(
-            bottom: -150,
-            left: -150,
-            child: Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.amethystPurple.withValues(alpha: 0.1),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.amethystPurple.withValues(alpha: 0.08),
-                    blurRadius: 180,
-                    spreadRadius: 80,
-                  )
-                ],
-              ),
-            ),
-          ),
-
-          // ─── SCROLLABLE REGISTER FORM ────────────────────────────────────
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 28.0),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF252d3a).withValues(alpha: 0.87),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                      color: const Color(0xFF3d4d6b), width: 0.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF1e3a5f).withValues(alpha: 0.25),
+                      blurRadius: 60,
+                      spreadRadius: 8,
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 32, vertical: 40),
                 child: Form(
                   key: _formKey,
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 20),
-                      
-                      // ─── STAGE HEADING ─────────────────────────────────────
+                      _buildLogo(),
+                      const SizedBox(height: 32),
                       Text(
-                        'Join the Arena',
+                        'Create an account',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.outfit(
-                          fontSize: 32,
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
-                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Join us and get started today',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          color: const Color(0xFF94a3b8),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      Text(
+                        'Full Name',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFe2e8f0),
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        'CREATE YOUR CORE-360 BIO-IDENTITY',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
-                          color: AppTheme.amethystPurple,
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-
-                      // ─── NAME INPUT ──────────────────────────────────────
                       TextFormField(
                         controller: _nameController,
-                        style: GoogleFonts.outfit(color: Colors.white),
-                        decoration: const InputDecoration(
-                          labelText: 'Full Name',
-                          prefixIcon: Icon(Icons.person_outline, color: Colors.white70),
-                          hintText: 'John Doe',
-                        ),
+                        style: GoogleFonts.outfit(
+                            color: Colors.white, fontSize: 14),
+                        decoration: _inputDecoration('John Doe'),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Please enter your full name';
@@ -370,47 +333,57 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                         },
                       ),
                       const SizedBox(height: 20),
-
-                      // ─── EMAIL INPUT ─────────────────────────────────────
+                      Text(
+                        'Email address',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFe2e8f0),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        style: GoogleFonts.outfit(color: Colors.white),
-                        decoration: const InputDecoration(
-                          labelText: 'Email Address',
-                          prefixIcon: Icon(Icons.mail_outline, color: Colors.white70),
-                          hintText: 'name@example.com',
-                        ),
+                        style: GoogleFonts.outfit(
+                            color: Colors.white, fontSize: 14),
+                        decoration: _inputDecoration('you@example.com'),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Please enter your email';
                           }
-                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                          if (!EmailValidator.validate(value.trim())) {
                             return 'Please enter a valid email address';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 20),
-
-                      // ─── PASSWORD INPUT ──────────────────────────────────
+                      Text(
+                        'Password',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFe2e8f0),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        style: GoogleFonts.outfit(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
+                        style: GoogleFonts.outfit(
+                            color: Colors.white, fontSize: 14),
+                        decoration: _inputDecoration(
+                          '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                              color: Colors.white60,
+                              _obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: const Color(0xFF94a3b8),
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
+                            onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
                           ),
                         ),
                         validator: (value) {
@@ -424,25 +397,31 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                         },
                       ),
                       const SizedBox(height: 20),
-
-                      // ─── CONFIRM PASSWORD INPUT ──────────────────────────
+                      Text(
+                        'Confirm Password',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFe2e8f0),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
                       TextFormField(
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
-                        style: GoogleFonts.outfit(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Confirm Password',
-                          prefixIcon: const Icon(Icons.lock_reset, color: Colors.white70),
+                        style: GoogleFonts.outfit(
+                            color: Colors.white, fontSize: 14),
+                        decoration: _inputDecoration(
+                          '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                              color: Colors.white60,
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: const Color(0xFF94a3b8),
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
-                              });
-                            },
+                            onPressed: () => setState(
+                                () => _obscureConfirmPassword = !_obscureConfirmPassword),
                           ),
                         ),
                         validator: (value) {
@@ -461,38 +440,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                           duration: const Duration(milliseconds: 300),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: AppTheme.darkSurface,
-                            borderRadius: BorderRadius.circular(16),
+                            color: const Color(0xFF323b49),
+                            borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: _fingerprintEnabled 
-                                  ? AppTheme.cyberCyan.withValues(alpha: 0.8) 
-                                  : AppTheme.cardBorderColor, 
-                              width: 1.5,
+                                  ? const Color(0xFF22c55e)
+                                  : const Color(0xFF3d4a5e).withValues(alpha: 0.5), 
+                              width: 0.5,
                             ),
-                            boxShadow: [
-                              if (_fingerprintEnabled)
-                                BoxShadow(
-                                  color: AppTheme.cyberCyan.withValues(alpha: 0.15),
-                                  blurRadius: 12,
-                                  spreadRadius: 1,
-                                ),
-                            ],
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Row(
                                 children: [
-                                  ShaderMask(
-                                    shaderCallback: (bounds) => (_fingerprintEnabled 
-                                            ? AppTheme.primaryGradient 
-                                            : const LinearGradient(colors: [Colors.white54, Colors.white54]))
-                                        .createShader(bounds),
-                                    child: Icon(
-                                      Icons.fingerprint,
-                                      color: _fingerprintEnabled ? Colors.white : Colors.white54,
-                                      size: 26,
-                                    ),
+                                  Icon(
+                                    Icons.fingerprint,
+                                    color: _fingerprintEnabled ? const Color(0xFF22c55e) : const Color(0xFF94a3b8),
+                                    size: 24,
                                   ),
                                   const SizedBox(width: 12),
                                   Column(
@@ -503,14 +468,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                                         style: GoogleFonts.outfit(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w600,
-                                          fontSize: 14,
+                                          fontSize: 13,
                                         ),
                                       ),
                                       Text(
                                         'Secure, instant bio-identity setup',
                                         style: GoogleFonts.outfit(
-                                          color: Colors.white38,
-                                          fontSize: 11,
+                                          color: const Color(0xFF94a3b8),
+                                          fontSize: 10,
                                         ),
                                       ),
                                     ],
@@ -519,31 +484,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                               ),
                               Switch(
                                 value: _fingerprintEnabled,
-                                activeThumbColor: AppTheme.cyberCyan,
-                                activeTrackColor: AppTheme.cyberCyan.withValues(alpha: 0.3),
-                                inactiveThumbColor: Colors.white30,
-                                inactiveTrackColor: Colors.black26,
+                                activeColor: const Color(0xFF22c55e),
+                                activeTrackColor: const Color(0xFF22c55e).withValues(alpha: 0.3),
+                                inactiveThumbColor: const Color(0xFF94a3b8),
+                                inactiveTrackColor: const Color(0xFF1e293b),
                                 onChanged: _handleFingerprintToggle,
                               ),
                             ],
                           ),
                         ),
                       ],
-                      const SizedBox(height: 36),
-
-                      // ─── REGISTER SUBMIT CTA ─────────────────────────────
+                      const SizedBox(height: 28),
                       Container(
-                        height: 56,
+                        height: 48,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          gradient: AppTheme.secondaryGradient,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.amethystPurple.withValues(alpha: 0.3),
-                              blurRadius: 18,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: ElevatedButton(
                           onPressed: authState is AuthLoading ? null : _submit,
@@ -551,84 +507,113 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                             backgroundColor: Colors.transparent,
                             shadowColor: Colors.transparent,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                           ),
                           child: Text(
-                            'CREATE ACCOUNT',
+                            'Sign Up',
                             style: GoogleFonts.outfit(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 1.2,
+                              color: Colors.black,
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(height: 24),
-
-                      // ─── LOGIN REDIRECT LINK ─────────────────────────────
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            "Already registered? ",
-                            style: GoogleFonts.outfit(color: Colors.white60, fontSize: 14),
+                            "Already have an account? ",
+                            style: GoogleFonts.outfit(
+                              color: const Color(0xFF94a3b8),
+                              fontSize: 13,
+                            ),
                           ),
                           GestureDetector(
-                            onTap: () {
-                              Navigator.pop(context);
-                            },
+                            onTap: () => Navigator.pop(context),
                             child: Text(
-                              "Sign In Instead",
+                              'Sign in',
                               style: GoogleFonts.outfit(
-                                color: AppTheme.cyberCyan,
+                                color: const Color(0xFFe2e8f0),
                                 fontWeight: FontWeight.bold,
-                                decoration: TextDecoration.underline,
-                                fontSize: 14,
+                                fontSize: 13,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
 
-          // ─── ACTION HUD LOADER ───────────────────────────────────────────
-          if (authState is AuthLoading)
-            Container(
-              color: Colors.black.withValues(alpha: 0.7),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: AppTheme.darkSurface,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: AppTheme.cardBorderColor, width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.amethystPurple.withValues(alpha: 0.1),
-                        blurRadius: 40,
-                      )
-                    ],
-                  ),
-                  child: const Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.amethystPurple),
-                        strokeWidth: 3.5,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+  InputDecoration _inputDecoration(String hint, {Widget? suffixIcon}) {
+    return InputDecoration(
+      filled: true,
+      fillColor: const Color(0xFF323b49),
+      hintText: hint,
+      hintStyle:
+          GoogleFonts.outfit(color: const Color(0xFF94a3b8), fontSize: 14),
+      suffixIcon: suffixIcon,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide:
+            BorderSide(color: const Color(0xFF3d4a5e).withValues(alpha: 0.5), width: 0.5),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide:
+            BorderSide(color: const Color(0xFF3d4a5e).withValues(alpha: 0.5), width: 0.5),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFF22c55e), width: 1),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+      ),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'CORE 360',
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 3,
+              color: Colors.white,
             ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'AI FORM GUARD™',
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1,
+              color: const Color(0xFF22c55e),
+            ),
+          ),
         ],
       ),
     );

@@ -91,10 +91,7 @@ class AiWorkoutRoutine {
       routineName: json['routineName'] as String? ?? '',
       summary: json['summary'] as String? ?? '',
       exercises: exercisesJson
-          .map(
-            (e) =>
-                AiWorkoutExercise.fromJson(Map<String, dynamic>.from(e as Map)),
-          )
+          .map((e) => AiWorkoutExercise.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
       warnings: warningsJson.map((w) => w.toString()).toList(),
     );

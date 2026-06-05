@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise.dart';
 import '../providers/workout_provider.dart';
@@ -32,6 +33,127 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
         );
       }
     }
+  }
+
+  void _showExerciseGuideDialog(Exercise exercise) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppTheme.darkSurface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: AppTheme.cardBorderColor, width: 1.2),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(24, 20, 16, 10),
+          title: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      exercise.title.toUpperCase(),
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 16,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.cyberCyan.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        exercise.targetMuscle.toUpperCase(),
+                        style: GoogleFonts.outfit(
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.cyberCyan,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                onPressed: () => Navigator.pop(dialogContext),
+              ),
+            ],
+          ),
+          contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (exercise.gifUrl.isNotEmpty) ...[
+                  Container(
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppTheme.cyberCyan.withOpacity(0.25),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: AspectRatio(
+                      aspectRatio: 1.0,
+                      child: CachedNetworkImage(
+                        imageUrl: exercise.gifUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(color: AppTheme.cyberCyan),
+                        ),
+                        errorWidget: (context, url, error) => const Center(
+                          child: Icon(Icons.broken_image, color: Colors.white24, size: 40),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                Text(
+                  exercise.description,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    color: Colors.white70,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+          actions: [
+            if (exercise.videoUrl.isNotEmpty)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.cyberCyan,
+                  foregroundColor: Colors.black,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                icon: const Icon(Icons.open_in_new, size: 16),
+                label: Text(
+                  'WATCH VIDEO',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                ),
+                onPressed: () {
+                  _launchVideo(exercise.videoUrl);
+                },
+              ),
+          ],
+        );
+      },
+    );
   }
 
   void _showCreateCustomExerciseDialog() {
@@ -309,7 +431,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                                 Navigator.pop(context, exercise);
                               },
                               leading: GestureDetector(
-                                onTap: exercise.videoUrl.isNotEmpty ? () => _launchVideo(exercise.videoUrl) : null,
+                                onTap: () => _showExerciseGuideDialog(exercise),
                                 child: ExerciseGifWidget(
                                   gifUrl: exercise.gifUrl,
                                   thumbnailUrl: exercise.thumbnailUrl,
@@ -337,7 +459,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                                         color: AppTheme.cyberCyan,
                                         size: 22,
                                       ),
-                                      onPressed: () => _launchVideo(exercise.videoUrl),
+                                      onPressed: () => _showExerciseGuideDialog(exercise),
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
                                     ),

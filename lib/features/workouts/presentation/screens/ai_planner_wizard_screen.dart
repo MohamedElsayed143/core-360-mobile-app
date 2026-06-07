@@ -481,20 +481,48 @@ class AiPlannerWizardScreen extends ConsumerWidget {
 
             // Generate Button
             ElevatedButton(
-              onPressed: () async {
-                final routine = await notifier.generateAiRoutine();
-                if (routine == null && context.mounted && state.errorMessage != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        state.errorMessage!,
-                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-                      ),
-                      backgroundColor: Colors.redAccent,
-                    ),
-                  );
-                }
-              },
+              onPressed: state.isGenerating
+                  ? () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'AI is already compiling your routine...',
+                                style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: AppTheme.amethystPurple,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  : () async {
+                      final routine = await notifier.generateAiRoutine();
+                      if (routine == null && context.mounted && state.errorMessage != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              state.errorMessage!,
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                            ),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                      }
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.transparent,
                 shadowColor: Colors.transparent,
@@ -505,8 +533,12 @@ class AiPlannerWizardScreen extends ConsumerWidget {
               ),
               child: Ink(
                 decoration: BoxDecoration(
-                  gradient: AppTheme.secondaryGradient,
+                  gradient: state.isGenerating ? null : AppTheme.secondaryGradient,
+                  color: state.isGenerating ? AppTheme.darkSurface : null,
                   borderRadius: BorderRadius.circular(16),
+                  border: state.isGenerating
+                      ? Border.all(color: AppTheme.amethystPurple.withValues(alpha: 0.4), width: 1.2)
+                      : null,
                 ),
                 child: Container(
                   height: 56,
@@ -514,13 +546,23 @@ class AiPlannerWizardScreen extends ConsumerWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.bolt, color: Colors.white, size: 20),
+                      if (state.isGenerating)
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            color: AppTheme.amethystPurple,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      else
+                        const Icon(Icons.bolt, color: Colors.white, size: 20),
                       const SizedBox(width: 10),
                       Text(
-                        'GENERATE AI ROUTINE',
+                        state.isGenerating ? 'COMPILING NEURAL PLAN...' : 'GENERATE AI ROUTINE',
                         style: GoogleFonts.outfit(
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: state.isGenerating ? AppTheme.textSub : Colors.white,
                           letterSpacing: 1.0,
                         ),
                       ),

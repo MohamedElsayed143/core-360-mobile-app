@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb; // جلب أداة كشف الويب
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/theme/app_theme.dart';
@@ -10,20 +11,32 @@ import 'features/onboarding/presentation/screens/home_placeholder_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Firebase with defensive try/catch to support offline testing mode gracefully.
+
   bool isFirebaseInitialized = false;
   try {
-    await Firebase.initializeApp();
+    if (kIsWeb) {
+      // حقن إعدادات الويب مباشرة في حالة تشغيل جوجل كروم
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: "AIzaSyAisFhl-t9gNpZfxjKRg3UeILnkRNdog9s",
+          authDomain: "core-360-bbf64.firebaseapp.com",
+          projectId: "core-360-bbf64",
+          storageBucket: "core-360-bbf64.firebasestorage.app",
+          messagingSenderId: "943095263495",
+          appId: "1:943095263495:web:c1fd8c7576d090fa4e95a2",
+        ),
+      );
+    } else {
+      // تشغيل الكود الأصلي للموبايل (أندرويد / آيفون)
+      await Firebase.initializeApp();
+    }
     isFirebaseInitialized = true;
   } catch (e) {
     debugPrint('Firebase initialization warning: $e');
   }
 
   runApp(
-    ProviderScope(
-      child: MyApp(isFirebaseInitialized: isFirebaseInitialized),
-    ),
+    ProviderScope(child: MyApp(isFirebaseInitialized: isFirebaseInitialized)),
   );
 }
 
@@ -48,7 +61,6 @@ class RootAuthBridge extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // If Firebase failed to initialize, render a clean error or offline simulation screen.
     if (!isFirebaseInitialized) {
       return const FirebaseErrorScreen();
     }
@@ -79,7 +91,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animController;
 
   @override
@@ -112,17 +125,23 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppTheme.darkSurface,
-                    border: Border.all(color: AppTheme.cardBorderColor, width: 1.5),
+                    border: Border.all(
+                      color: AppTheme.cardBorderColor,
+                      width: 1.5,
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.cyberCyan.withOpacity(0.05 + (_animController.value * 0.1)),
+                        color: AppTheme.cyberCyan.withValues(
+                          alpha: 0.05 + (_animController.value * 0.1),
+                        ),
                         blurRadius: 40,
                         spreadRadius: 2,
-                      )
+                      ),
                     ],
                   ),
                   child: ShaderMask(
-                    shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
+                    shaderCallback: (bounds) =>
+                        AppTheme.primaryGradient.createShader(bounds),
                     child: const Icon(
                       Icons.all_inclusive,
                       size: 64,
@@ -175,12 +194,15 @@ class ErrorScreen extends ConsumerWidget {
             decoration: BoxDecoration(
               color: AppTheme.darkSurface,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.redAccent.withOpacity(0.3), width: 1.5),
+              border: Border.all(
+                color: Colors.redAccent.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.redAccent.withOpacity(0.05),
+                  color: Colors.redAccent.withValues(alpha: 0.05),
                   blurRadius: 30,
-                )
+                ),
               ],
             ),
             child: Column(
@@ -268,9 +290,9 @@ class FirebaseErrorScreen extends StatelessWidget {
               border: Border.all(color: AppTheme.cardBorderColor, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.cyberCyan.withOpacity(0.04),
+                  color: AppTheme.cyberCyan.withValues(alpha: 0.04),
                   blurRadius: 30,
-                )
+                ),
               ],
             ),
             child: Column(
@@ -317,7 +339,7 @@ class FirebaseErrorScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.4),
+                    color: Colors.black.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(

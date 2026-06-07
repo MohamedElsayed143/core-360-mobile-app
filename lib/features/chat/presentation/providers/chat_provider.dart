@@ -104,21 +104,33 @@ class ChatNotifier extends Notifier<ChatState> {
       debugPrint('Failed to extract user context for RAG injection: $e');
     }
 
-    bool yieldedAny = false;
-
     try {
-      // Stream chunks from backend SSE endpoint with a 6-second timeout
+      // Guard: 10-second CONNECTION timeout only.
+      // Once the first chunk arrives we let the stream run to completion
+      // so long plan-proposal responses are never cut off mid-message.
+      bool firstChunkReceived = false;
+
       final stream = apiClient.streamChat(
         state.messages.where((m) => m.id != assistantMsgId).toList(),
         healthMetrics: healthMetrics,
         activeSessionLogs: activeSessionLogs,
-      ).timeout(const Duration(seconds: 6));
+      );
 
-      await for (final chunk in stream) {
-        yieldedAny = true;
+      await for (final chunk in stream.timeout(
+        const Duration(seconds: 10),
+        onTimeout: (sink) {
+          // Only close if we haven't seen any data yet (connection hung)
+          if (!firstChunkReceived) {
+            debugPrint('Backend chat: no response in 10s — closing stream and using fallback.');
+            sink.close();
+          }
+          // If data is flowing, reset is not possible via onTimeout, but
+          // simply not closing prevents the stream from being killed.
+        },
+      )) {
+        firstChunkReceived = true;
         accumulatedBuffer.write(chunk);
-        
-        // Dynamic parsed model mapping with regex handling
+
         final updatedAssistantMsg = ChatMessageModel.fromStreamUpdate(
           id: assistantMsgId,
           role: 'assistant',
@@ -126,42 +138,21 @@ class ChatNotifier extends Notifier<ChatState> {
           isStreaming: true,
         );
 
-        // Update list inline to trigger real-time micro-animation changes
         state = state.copyWith(
-          messages: state.messages.map((m) => m.id == assistantMsgId ? updatedAssistantMsg : m).toList(),
+          messages: state.messages
+              .map((m) => m.id == assistantMsgId ? updatedAssistantMsg : m)
+              .toList(),
         );
       }
     } catch (e) {
       debugPrint('Error or timeout in backend chat stream: $e');
     }
 
-    // Fallback if no content was yielded from the backend
-    if (!yieldedAny) {
-      debugPrint('No content yielded from backend. Falling back to local RAG AI Coach.');
-      try {
-        final simulatedStream = apiClient.streamSimulatedChatResponse(
-          state.messages.where((m) => m.id != assistantMsgId).toList(),
-          healthMetrics: healthMetrics,
-          activeSessionLogs: activeSessionLogs,
-        );
-        await for (final chunk in simulatedStream) {
-          accumulatedBuffer.write(chunk);
 
-          final updatedAssistantMsg = ChatMessageModel.fromStreamUpdate(
-            id: assistantMsgId,
-            role: 'assistant',
-            accumulatedContent: accumulatedBuffer.toString(),
-            isStreaming: true,
-          );
 
-          state = state.copyWith(
-            messages: state.messages.map((m) => m.id == assistantMsgId ? updatedAssistantMsg : m).toList(),
-          );
-        }
-      } catch (simError) {
-        debugPrint('Error in simulated chat stream: $simError');
-      }
-    }
+    // Note: the fallback to the local simulated AI is now handled
+    // internally inside ApiClient.streamChat — no secondary fallback needed here.
+
 
     // Mark streaming completed
     final finalAssistantMsg = ChatMessageModel.fromStreamUpdate(

@@ -10,6 +10,17 @@ import '../../domain/entities/routine_exercise.dart';
 import '../../domain/entities/set_config.dart';
 import 'workout_provider.dart';
 
+// ─── Sentinel wrapper ─────────────────────────────────────────────────────────
+// Allows copyWith to distinguish "caller wants to set this field to null"
+// from "caller did not mention this field at all". Without this, passing
+// errorMessage: null and omitting errorMessage are indistinguishable.
+class Wrap<T> {
+  const Wrap(this.value);
+  final T? value;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 class AiPlannerState {
   final int step; // 0 to 3
   final String experienceLevel; // 'beginner', 'intermediate', 'advanced'
@@ -29,14 +40,23 @@ class AiPlannerState {
     this.generatedRoutine,
   });
 
+  /// Nullable fields (`errorMessage`, `generatedRoutine`) use a [_Wrap]
+  /// sentinel so callers can explicitly set them to null without ambiguity.
+  ///
+  /// Usage:
+  ///   // Clear errorMessage intentionally:
+  ///   state.copyWith(errorMessage: const Wrap(null))
+  ///
+  ///   // Leave errorMessage untouched:
+  ///   state.copyWith(isGenerating: true)   // no errorMessage arg
   AiPlannerState copyWith({
     int? step,
     String? experienceLevel,
     int? trainingFrequency,
     String? splitFocus,
     bool? isGenerating,
-    String? errorMessage,
-    Routine? generatedRoutine,
+    Wrap<String>? errorMessage,       // use Wrap(null) to clear
+    Wrap<Routine>? generatedRoutine,  // use Wrap(null) to clear
   }) {
     return AiPlannerState(
       step: step ?? this.step,
@@ -44,8 +64,8 @@ class AiPlannerState {
       trainingFrequency: trainingFrequency ?? this.trainingFrequency,
       splitFocus: splitFocus ?? this.splitFocus,
       isGenerating: isGenerating ?? this.isGenerating,
-      errorMessage: errorMessage,
-      generatedRoutine: generatedRoutine ?? this.generatedRoutine,
+      errorMessage: errorMessage != null ? errorMessage.value : this.errorMessage,
+      generatedRoutine: generatedRoutine != null ? generatedRoutine.value : this.generatedRoutine,
     );
   }
 }
@@ -95,7 +115,8 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
     }
   }
 
-  String _capitalize(String s) => s.isEmpty ? '' : s[0].toUpperCase() + s.substring(1);
+  String _capitalize(String s) =>
+      s.isEmpty ? '' : s[0].toUpperCase() + s.substring(1);
 
   int _parseReps(String repsStr) {
     final match = RegExp(r'\d+').firstMatch(repsStr);
@@ -140,7 +161,7 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
       } else {
         state = state.copyWith(
           isGenerating: false,
-          errorMessage: "Authentication failed. Please sign in.",
+          errorMessage: const Wrap('Authentication failed. Please sign in.'),
         );
         return null;
       }
@@ -150,7 +171,11 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
     final globalWorkoutsAsync = ref.read(globalWorkoutsProvider);
     final globalWorkouts = globalWorkoutsAsync.value ?? [];
 
-    state = state.copyWith(isGenerating: true, errorMessage: null, generatedRoutine: null);
+    state = state.copyWith(
+      isGenerating: true,
+      errorMessage: const Wrap(null),       // explicitly clear any prior error
+      generatedRoutine: const Wrap(null),   // clear any prior result
+    );
 
     try {
       final apiClient = ref.read(apiClientProvider);
@@ -176,22 +201,32 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
         Exercise matchedExercise;
         try {
           matchedExercise = globalWorkouts.firstWhere(
-            (w) => w.title.toLowerCase().trim() == apiEx.name.toLowerCase().trim(),
+            (w) =>
+                w.title.toLowerCase().trim() ==
+                apiEx.name.toLowerCase().trim(),
           );
         } catch (_) {
           try {
             matchedExercise = globalWorkouts.firstWhere(
-              (w) => w.title.toLowerCase().contains(apiEx.name.toLowerCase()) ||
-                     apiEx.name.toLowerCase().contains(w.title.toLowerCase()),
+              (w) =>
+                  w.title
+                      .toLowerCase()
+                      .contains(apiEx.name.toLowerCase()) ||
+                  apiEx.name
+                      .toLowerCase()
+                      .contains(w.title.toLowerCase()),
             );
           } catch (_) {
-            final resolvedVideoUrl = await apiClient.getWorkoutVideoUrl(apiEx.name);
-            final resolvedGifUrl = await apiClient.getWorkoutGifUrl(apiEx.name);
+            final resolvedVideoUrl =
+                await apiClient.getWorkoutVideoUrl(apiEx.name);
+            final resolvedGifUrl =
+                await apiClient.getWorkoutGifUrl(apiEx.name);
             matchedExercise = Exercise(
               id: 'dynamic_${apiEx.name.toLowerCase().replaceAll(' ', '_')}',
               title: apiEx.name,
               description: apiEx.notes,
-              targetMuscle: state.splitFocus == 'lower' ? 'legs' : 'chest',
+              targetMuscle:
+                  state.splitFocus == 'lower' ? 'legs' : 'chest',
               thumbnailUrl: '',
               videoUrl: resolvedVideoUrl,
               gifUrl: resolvedGifUrl,
@@ -231,7 +266,8 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
 
       state = state.copyWith(
         isGenerating: false,
-        generatedRoutine: generatedRoutine,
+        generatedRoutine: Wrap(generatedRoutine),
+        // errorMessage intentionally omitted — leave it as already-cleared null
       );
 
       return generatedRoutine;
@@ -239,7 +275,10 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
       debugPrint('Error generating routine: $e\n$stack');
       state = state.copyWith(
         isGenerating: false,
-        errorMessage: 'Failed to generate AI routine from Next.js server: $e',
+        errorMessage: Wrap(
+          'Failed to generate AI routine from Next.js server: $e',
+        ),
+        // generatedRoutine intentionally omitted — keep whatever was there
       );
       return null;
     }
@@ -248,17 +287,21 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
   Future<void> saveGeneratedRoutine() async {
     final routine = state.generatedRoutine;
     if (routine == null) return;
-    
+
     try {
       await ref.read(userRoutinesProvider.notifier).saveRoutine(routine);
-      state = state.copyWith(generatedRoutine: null);
+      // Correctly clears generatedRoutine to null after saving
+      state = state.copyWith(generatedRoutine: const Wrap(null));
     } catch (e) {
-      state = state.copyWith(errorMessage: 'Failed to save generated routine: $e');
+      state = state.copyWith(
+        errorMessage: Wrap('Failed to save generated routine: $e'),
+      );
       rethrow;
     }
   }
 }
 
-final aiPlannerProvider = NotifierProvider<AiPlannerNotifier, AiPlannerState>(() {
+final aiPlannerProvider =
+    NotifierProvider<AiPlannerNotifier, AiPlannerState>(() {
   return AiPlannerNotifier();
 });

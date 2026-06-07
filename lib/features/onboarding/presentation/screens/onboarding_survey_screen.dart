@@ -246,7 +246,7 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
               ),
               if (authState is AuthLoading)
                 Container(
-                  color: Colors.black.withOpacity(0.7),
+                  color: Colors.black.withValues(alpha: 0.7),
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.all(32),
@@ -256,7 +256,7 @@ class _OnboardingSurveyScreenState extends ConsumerState<OnboardingSurveyScreen>
                         border: Border.all(color: const Color(0xFF3d4d6b), width: 0.5),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF22c55e).withOpacity(0.1),
+                            color: const Color(0xFF22c55e).withValues(alpha: 0.1),
                             blurRadius: 40,
                           )
                         ],

@@ -118,6 +118,42 @@ class MockAuthRepository implements AuthRepository {
     return _profiles[userId];
   }
 
+  @override
+  Future<void> reauthenticate(String password) async {}
+
+  @override
+  Future<void> changePassword(String newPassword) async {}
+
+  @override
+  Future<void> updateEmail(String newEmail) async {}
+
+  @override
+  Future<void> updateDisplayName(String newName) async {}
+
+  @override
+  Future<void> updatePhotoURL(String url) async {}
+
+  @override
+  Future<String> uploadProfilePhoto(String userId, String filePath) async => '';
+
+  @override
+  Future<void> deleteAccount() async {}
+
+  @override
+  Future<void> deleteAllUserData(String userId) async {}
+
+  @override
+  Future<void> enableTwoFactorAuth(String userId, String phoneNumber) async {}
+
+  @override
+  Future<void> disableTwoFactorAuth(String userId) async {}
+
+  @override
+  Future<Map<String, dynamic>> exportUserData(String userId) async => {};
+
+  @override
+  Future<void> updateFitnessProfile(String userId, UserProfile profile) async {}
+
   void dispose() {
     _authController.close();
   }

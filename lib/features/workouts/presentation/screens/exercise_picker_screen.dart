@@ -66,7 +66,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppTheme.cyberCyan.withOpacity(0.08),
+                        color: AppTheme.cyberCyan.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -100,7 +100,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AppTheme.cyberCyan.withOpacity(0.25),
+                        color: AppTheme.cyberCyan.withValues(alpha: 0.25),
                         width: 1.2,
                       ),
                     ),
@@ -361,10 +361,10 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                     decoration: BoxDecoration(
                       color: AppTheme.darkSurface,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.amethystPurple.withOpacity(0.4), width: 1.2),
+                      border: Border.all(color: AppTheme.amethystPurple.withValues(alpha: 0.4), width: 1.2),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.amethystPurple.withOpacity(0.05),
+                          color: AppTheme.amethystPurple.withValues(alpha: 0.05),
                           blurRadius: 8,
                         )
                       ],
@@ -420,7 +420,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                               border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppTheme.cyberCyan.withOpacity(0.01),
+                                  color: AppTheme.cyberCyan.withValues(alpha: 0.01),
                                   blurRadius: 10,
                                 )
                               ],
@@ -470,9 +470,9 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                                       margin: const EdgeInsets.only(left: 6),
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.amethystPurple.withOpacity(0.1),
+                                        color: AppTheme.amethystPurple.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: AppTheme.amethystPurple.withOpacity(0.3)),
+                                        border: Border.all(color: AppTheme.amethystPurple.withValues(alpha: 0.3)),
                                       ),
                                       child: Text(
                                         'AI',
@@ -492,7 +492,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.cyberCyan.withOpacity(0.06),
+                                      color: AppTheme.cyberCyan.withValues(alpha: 0.06),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(

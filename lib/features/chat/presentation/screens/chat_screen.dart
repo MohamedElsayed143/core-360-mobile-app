@@ -329,15 +329,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                   child: message.isStreaming && message.content.isEmpty
-                      ? SizedBox(
-                          width: 24,
-                          height: 12,
-                          child: LinearProgressIndicator(
-                            color: AppTheme.cyberCyan.withValues(alpha: 0.5),
-                            backgroundColor: Colors.transparent,
-                            minHeight: 2,
-                          ),
-                        )
+                      ? const _ThinkingDots()
                       : Text(
                           message.content,
                           style: GoogleFonts.outfit(
@@ -784,5 +776,93 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     _messageController.clear();
     ref.read(chatProvider.notifier).sendMessage(text);
+  }
+}
+
+/// Animated three-dot "thinking" indicator shown while the AI is streaming.
+class _ThinkingDots extends StatefulWidget {
+  const _ThinkingDots();
+
+  @override
+  State<_ThinkingDots> createState() => _ThinkingDotsState();
+}
+
+class _ThinkingDotsState extends State<_ThinkingDots>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late List<Animation<double>> _dotAnimations;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+
+    // Stagger each dot by 200 ms
+    _dotAnimations = List.generate(3, (i) {
+      final start = i * 0.2;
+      final end = start + 0.4;
+      return Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+          parent: _controller,
+          curve: Interval(start, end, curve: Curves.easeInOut),
+        ),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'THINKING...',
+          style: GoogleFonts.outfit(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+            color: AppTheme.cyberCyan.withValues(alpha: 0.6),
+          ),
+        ),
+        const SizedBox(height: 8),
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (i) {
+                final scale = 0.5 + (_dotAnimations[i].value * 0.5);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Transform.scale(
+                    scale: scale,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.cyberCyan.withValues(
+                          alpha: 0.3 + (_dotAnimations[i].value * 0.7),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            );
+          },
+        ),
+      ],
+    );
   }
 }

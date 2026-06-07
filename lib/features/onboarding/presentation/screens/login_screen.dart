@@ -15,7 +15,8 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderStateMixin {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -34,6 +35,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   bool _canCheckBiometrics = false;
   bool _fingerprintEnabled = false;
   ProviderSubscription<AuthState>? _authSubscription;
+
+  // ── Cached credentials so the first biometric tap is instant ─────────
+  String? _cachedEmail;
+  String? _cachedPassword;
 
   @override
   void initState() {
@@ -70,7 +75,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             SnackBar(
               backgroundColor: Colors.redAccent,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               content: Row(
                 children: [
                   const Icon(Icons.error_outline, color: Colors.white),
@@ -78,7 +84,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                   Expanded(
                     child: Text(
                       next.message,
-                      style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.outfit(
+                          color: Colors.white, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
@@ -111,6 +118,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   }
 
   // ─── BIOMETRIC TOKEN DETECTION ───────────────────────────────────────
+  // Reads and CACHES credentials here so _authenticateWithBiometrics
+  // can fire the scanner immediately on the first tap (no async reads).
   Future<void> _checkBiometricToken() async {
     try {
       final canCheck = await _localAuth.canCheckBiometrics;
@@ -132,6 +141,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
           email.trim().isNotEmpty &&
           password != null &&
           password.trim().isNotEmpty) {
+        // ── Cache here so the tap handler has zero async overhead ──────
+        _cachedEmail = email.trim();
+        _cachedPassword = password;
+
         setState(() {
           _hasBiometricToken = true;
           _fingerprintEnabled = true;
@@ -140,6 +153,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
           _authenticateWithBiometrics();
         });
       } else {
+        _cachedEmail = null;
+        _cachedPassword = null;
         setState(() {
           _hasBiometricToken = false;
           _fingerprintEnabled = false;
@@ -153,7 +168,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
 
   Future<bool> _performBiometricScan() async {
     return await _localAuth.authenticate(
-      localizedReason: 'Scan fingerprint to authenticate secure access to Core-360',
+      localizedReason:
+          'Scan fingerprint to authenticate secure access to Core-360',
       options: const AuthenticationOptions(
         biometricOnly: true,
         stickyAuth: true,
@@ -193,6 +209,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
         debugPrintStack(stackTrace: stack);
       }
       if (!mounted) return;
+      _cachedEmail = null;
+      _cachedPassword = null;
       setState(() {
         _fingerprintEnabled = false;
         _hasBiometricToken = false;
@@ -231,15 +249,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       final success = await _authenticateBiometrics();
       if (!mounted) return;
       if (success) {
+        final email = _emailController.text;
+        final password = _passwordController.text;
+
+        // ── Persist and cache simultaneously ──────────────────────────
+        await _secureStorage.write(key: 'saved_email', value: email.trim());
+        await _secureStorage.write(key: 'saved_password', value: password);
+        await _secureStorage.write(
+            key: 'fingerprint_enabled', value: 'true');
+        _cachedEmail = email.trim();
+        _cachedPassword = password;
+
         setState(() {
           _fingerprintEnabled = true;
         });
-
-        final email = _emailController.text;
-        final password = _passwordController.text;
-        await _secureStorage.write(key: 'saved_email', value: email.trim());
-        await _secureStorage.write(key: 'saved_password', value: password);
-        await _secureStorage.write(key: 'fingerprint_enabled', value: 'true');
 
         await _submit();
       } else {
@@ -267,47 +290,69 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     }
   }
 
+  // ─── FAST BIOMETRIC LOGIN ─────────────────────────────────────────────
+  // Uses in-memory cached credentials — no storage reads on the hot path,
+  // so the scanner sheet opens on the very first frame after the tap.
   Future<void> _authenticateWithBiometrics() async {
     if (_isBioAuthenticating) return;
 
-    try {
-      final enabled = await _secureStorage.read(key: 'fingerprint_enabled');
-      final email = await _secureStorage.read(key: 'saved_email');
-      final password = await _secureStorage.read(key: 'saved_password');
+    // Fast-path: use cached values if available
+    final email = _cachedEmail;
+    final password = _cachedPassword;
 
-      if (!mounted) return;
+    if (email == null ||
+        email.isEmpty ||
+        password == null ||
+        password.isEmpty) {
+      // Cache miss — fall back to storage reads (first-install edge case)
+      try {
+        final enabled = await _secureStorage.read(key: 'fingerprint_enabled');
+        final storedEmail = await _secureStorage.read(key: 'saved_email');
+        final storedPassword =
+            await _secureStorage.read(key: 'saved_password');
 
-      if (enabled != 'true' ||
-          email == null ||
-          email.trim().isEmpty ||
-          password == null ||
-          password.trim().isEmpty) {
-        _showBiometricSnackBar(
-          'BIOMETRIC CREDENTIALS NOT CONFIGURED OR EXPIRED. PLEASE SIGN IN MANUALLY.',
-          const Color(0xFF22c55e),
-        );
-        setState(() {
-          _hasBiometricToken = false;
-          _fingerprintEnabled = false;
-        });
+        if (!mounted) return;
+
+        if (enabled != 'true' ||
+            storedEmail == null ||
+            storedEmail.trim().isEmpty ||
+            storedPassword == null ||
+            storedPassword.trim().isEmpty) {
+          _showBiometricSnackBar(
+            'BIOMETRIC CREDENTIALS NOT CONFIGURED OR EXPIRED. PLEASE SIGN IN MANUALLY.',
+            const Color(0xFF22c55e),
+          );
+          setState(() {
+            _hasBiometricToken = false;
+            _fingerprintEnabled = false;
+          });
+          return;
+        }
+
+        _cachedEmail = storedEmail.trim();
+        _cachedPassword = storedPassword;
+      } catch (e) {
+        debugPrint('Biometric credential read failed: $e');
         return;
       }
+    }
 
-      setState(() => _isBioAuthenticating = true);
+    setState(() => _isBioAuthenticating = true);
 
+    try {
       final authenticated = await _performBiometricScan();
 
       if (!mounted) return;
 
       if (authenticated) {
-        final postEmail = await _secureStorage.read(key: 'saved_email');
-        final postPassword = await _secureStorage.read(key: 'saved_password');
-        if (!mounted) return;
+        // Re-confirm cache is still valid after the scan
+        final postEmail = _cachedEmail;
+        final postPassword = _cachedPassword;
 
         if (postEmail == null ||
-            postEmail.trim().isEmpty ||
+            postEmail.isEmpty ||
             postPassword == null ||
-            postPassword.trim().isEmpty) {
+            postPassword.isEmpty) {
           setState(() {
             _isBioAuthenticating = false;
             _hasBiometricToken = false;
@@ -321,9 +366,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
         }
 
         ref.read(authProvider.notifier).signInWithBiometrics(
-          postEmail.trim(),
-          postPassword,
-        );
+              postEmail,
+              postPassword,
+            );
       } else {
         setState(() => _isBioAuthenticating = false);
       }
@@ -372,7 +417,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
         bool hasAuthenticated = false;
         for (int attempt = 0; attempt < 20; attempt++) {
           final authState = ref.read(authProvider);
-          if (authState is AuthenticatedWithProfile || authState is AuthenticatedWithoutProfile) {
+          if (authState is AuthenticatedWithProfile ||
+              authState is AuthenticatedWithoutProfile) {
             hasAuthenticated = true;
             break;
           }
@@ -392,7 +438,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                 ),
                 backgroundColor: Colors.redAccent,
                 behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
             );
           }
@@ -400,15 +447,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
         }
 
         final finalState = ref.read(authProvider);
-        if (finalState is AuthenticatedWithProfile || finalState is AuthenticatedWithoutProfile) {
+        if (finalState is AuthenticatedWithProfile ||
+            finalState is AuthenticatedWithoutProfile) {
           if (_fingerprintEnabled) {
-            await _secureStorage.write(key: 'saved_email', value: email.trim());
+            await _secureStorage.write(
+                key: 'saved_email', value: email.trim());
             await _secureStorage.write(key: 'saved_password', value: password);
-            await _secureStorage.write(key: 'fingerprint_enabled', value: 'true');
+            await _secureStorage.write(
+                key: 'fingerprint_enabled', value: 'true');
+            _cachedEmail = email.trim();
+            _cachedPassword = password;
           } else {
             await _secureStorage.delete(key: 'saved_email');
             await _secureStorage.delete(key: 'saved_password');
-            await _secureStorage.write(key: 'fingerprint_enabled', value: 'false');
+            await _secureStorage.write(
+                key: 'fingerprint_enabled', value: 'false');
+            _cachedEmail = null;
+            _cachedPassword = null;
           }
         }
       } catch (e, stack) {
@@ -416,55 +471,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
         debugPrintStack(stackTrace: stack);
       }
     }
-  }
-
-  Widget _buildBiometricButton(bool isLoading) {
-    return AnimatedBuilder(
-      animation: _glowAnimation,
-      builder: (context, child) {
-        final glowIntensity = _glowAnimation.value;
-
-        return GestureDetector(
-          onTap: isLoading ? null : _authenticateWithBiometrics,
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFF323b49),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Color.lerp(
-                  const Color(0xFF22c55e).withValues(alpha: 0.5),
-                  const Color(0xFF22c55e),
-                  glowIntensity,
-                )!,
-                width: 1.0 + (glowIntensity * 0.5),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF22c55e).withValues(alpha: 0.15 + (glowIntensity * 0.15)),
-                  blurRadius: 10 + (glowIntensity * 6),
-                  spreadRadius: glowIntensity * 1,
-                ),
-              ],
-            ),
-            child: _isBioAuthenticating
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF22c55e)),
-                      strokeWidth: 2.0,
-                    ),
-                  )
-                : Icon(
-                    Icons.fingerprint,
-                    color: Color.lerp(const Color(0xFF22c55e), Colors.white, glowIntensity * 0.3)!,
-                    size: 24,
-                  ),
-          ),
-        );
-      },
-    );
   }
 
   @override
@@ -490,13 +496,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 400),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF252d3a).withValues(alpha: 0.87),
+                      color:
+                          const Color(0xFF252d3a).withValues(alpha: 0.87),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                           color: const Color(0xFF3d4d6b), width: 0.5),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF1e3a5f).withValues(alpha: 0.25),
+                          color: const Color(0xFF1e3a5f)
+                              .withValues(alpha: 0.25),
                           blurRadius: 60,
                           spreadRadius: 8,
                         ),
@@ -510,6 +518,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // ── Logo ───────────────────────────────────────
                           _buildLogo(),
                           const SizedBox(height: 32),
                           Text(
@@ -522,6 +531,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                             ),
                           ),
                           const SizedBox(height: 32),
+
+                          // ── Email ──────────────────────────────────────
                           Text(
                             'Email address',
                             style: GoogleFonts.outfit(
@@ -536,7 +547,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                             keyboardType: TextInputType.emailAddress,
                             style: GoogleFonts.outfit(
                                 color: Colors.white, fontSize: 14),
-                            decoration: _inputDecoration('you@example.com'),
+                            decoration:
+                                _inputDecoration('you@example.com'),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Please enter your email';
@@ -548,6 +560,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                             },
                           ),
                           const SizedBox(height: 20),
+
+                          // ── Password ───────────────────────────────────
                           Text(
                             'Password',
                             style: GoogleFonts.outfit(
@@ -571,8 +585,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                                       : Icons.visibility_outlined,
                                   color: const Color(0xFF94a3b8),
                                 ),
-                                onPressed: () => setState(
-                                    () => _obscurePassword = !_obscurePassword),
+                                onPressed: () => setState(() =>
+                                    _obscurePassword = !_obscurePassword),
                               ),
                             ),
                             validator: (value) {
@@ -585,134 +599,257 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                               return null;
                             },
                           ),
+                          const SizedBox(height: 24),
+
+                          // ── Primary Sign In Button ─────────────────────
+                          Container(
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: ElevatedButton(
+                              onPressed:
+                                  authState is AuthLoading ? null : _submit,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                'Sign In',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // ── Biometric section (toggle + quick-login) ───
+                          // Rendered together below the primary button so
+                          // the fingerprint controls are spatially grouped
+                          // and well away from the password field.
                           if (_canCheckBiometrics) ...[
                             const SizedBox(height: 20),
+
+                            // OR divider
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    height: 1,
+                                    color: const Color(0xFF3d4a5e)
+                                        .withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'OR',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.6,
+                                    color: const Color(0xFF3d4a5e),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Container(
+                                    height: 1,
+                                    color: const Color(0xFF3d4a5e)
+                                        .withValues(alpha: 0.4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // ── Fingerprint Quick-Login Button ─────────
+                            // Always shown when biometrics are available;
+                            // visually disabled until a token is stored.
+                            AnimatedBuilder(
+                              animation: _glowAnimation,
+                              builder: (context, child) {
+                                final g = _hasBiometricToken && _fingerprintEnabled
+                                    ? _glowAnimation.value
+                                    : 0.0;
+                                final isActive =
+                                    _hasBiometricToken && _fingerprintEnabled;
+                                return GestureDetector(
+                                  onTap: (authState is AuthLoading ||
+                                          !isActive)
+                                      ? null
+                                      : _authenticateWithBiometrics,
+                                  child: AnimatedContainer(
+                                    duration:
+                                        const Duration(milliseconds: 300),
+                                    height: 52,
+                                    decoration: BoxDecoration(
+                                      color: isActive
+                                          ? const Color(0xFF1a2533)
+                                          : const Color(0xFF1e2733),
+                                      borderRadius:
+                                          BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isActive
+                                            ? Color.lerp(
+                                                const Color(0xFF22c55e)
+                                                    .withValues(alpha: 0.4),
+                                                const Color(0xFF22c55e),
+                                                g,
+                                              )!
+                                            : const Color(0xFF3d4a5e)
+                                                .withValues(alpha: 0.3),
+                                        width: isActive
+                                            ? 1.0 + (g * 0.5)
+                                            : 0.5,
+                                      ),
+                                      boxShadow: isActive
+                                          ? [
+                                              BoxShadow(
+                                                color: const Color(0xFF22c55e)
+                                                    .withValues(
+                                                        alpha: 0.10 +
+                                                            g * 0.12),
+                                                blurRadius: 12 + g * 8,
+                                                spreadRadius: g,
+                                              ),
+                                            ]
+                                          : [],
+                                    ),
+                                    child: _isBioAuthenticating
+                                        ? const Center(
+                                            child: SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child:
+                                                  CircularProgressIndicator(
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                            Color>(
+                                                        Color(0xFF22c55e)),
+                                                strokeWidth: 2.0,
+                                              ),
+                                            ),
+                                          )
+                                        : Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.fingerprint,
+                                                color: isActive
+                                                    ? Color.lerp(
+                                                        const Color(
+                                                            0xFF22c55e),
+                                                        Colors.white,
+                                                        g * 0.25,
+                                                      )!
+                                                    : const Color(
+                                                        0xFF4a5568),
+                                                size: 22,
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Text(
+                                                'SIGN IN WITH FINGERPRINT',
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 13,
+                                                  fontWeight:
+                                                      FontWeight.bold,
+                                                  color: isActive
+                                                      ? Color.lerp(
+                                                          const Color(
+                                                              0xFF22c55e),
+                                                          Colors.white,
+                                                          g * 0.25,
+                                                        )!
+                                                      : const Color(
+                                                          0xFF4a5568),
+                                                  letterSpacing: 0.5,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 12),
+
+                            // ── Enable Fingerprint Toggle ──────────────
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 300),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF323b49),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: _fingerprintEnabled 
+                                  color: _fingerprintEnabled
                                       ? const Color(0xFF22c55e)
-                                      : const Color(0xFF3d4a5e).withValues(alpha: 0.5), 
+                                      : const Color(0xFF3d4a5e)
+                                          .withValues(alpha: 0.5),
                                   width: 0.5,
                                 ),
                               ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.fingerprint,
-                                        color: _fingerprintEnabled ? const Color(0xFF22c55e) : const Color(0xFF94a3b8),
-                                        size: 24,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Enable Fingerprint Quick Login',
-                                            style: GoogleFonts.outfit(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 13,
-                                            ),
+                                  Icon(
+                                    Icons.fingerprint,
+                                    color: _fingerprintEnabled
+                                        ? const Color(0xFF22c55e)
+                                        : const Color(0xFF94a3b8),
+                                    size: 22,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Enable Fingerprint Quick Login',
+                                          style: GoogleFonts.outfit(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
                                           ),
-                                          Text(
-                                            'Secure, instant bio-identity setup',
-                                            style: GoogleFonts.outfit(
-                                              color: const Color(0xFF94a3b8),
-                                              fontSize: 10,
-                                            ),
+                                        ),
+                                        Text(
+                                          'Secure, instant bio-identity setup',
+                                          style: GoogleFonts.outfit(
+                                            color:
+                                                const Color(0xFF94a3b8),
+                                            fontSize: 10,
                                           ),
-                                        ],
-                                      ),
-                                    ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                   Switch(
                                     value: _fingerprintEnabled,
-                                    activeColor: const Color(0xFF22c55e),
-                                    activeTrackColor: const Color(0xFF22c55e).withValues(alpha: 0.3),
-                                    inactiveThumbColor: const Color(0xFF94a3b8),
-                                    inactiveTrackColor: const Color(0xFF1e293b),
+                                    activeThumbColor:
+                                        const Color(0xFF22c55e),
+                                    activeTrackColor: const Color(0xFF22c55e)
+                                        .withValues(alpha: 0.3),
+                                    inactiveThumbColor:
+                                        const Color(0xFF94a3b8),
+                                    inactiveTrackColor:
+                                        const Color(0xFF1e293b),
                                     onChanged: _handleFingerprintToggle,
                                   ),
                                 ],
                               ),
                             ),
                           ],
+
                           const SizedBox(height: 24),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: ElevatedButton(
-                                    onPressed: authState is AuthLoading ? null : _submit,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'Sign In',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (_hasBiometricToken && _fingerprintEnabled) ...[
-                                const SizedBox(width: 12),
-                                _buildBiometricButton(authState is AuthLoading),
-                              ],
-                            ],
-                          ),
-                          if (_hasBiometricToken && _fingerprintEnabled) ...[
-                            const SizedBox(height: 14),
-                            Center(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 28,
-                                    height: 1,
-                                    color: const Color(0xFF3d4a5e).withValues(alpha: 0.5),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    'OR TAP BIOMETRIC',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 1.6,
-                                      color: const Color(0xFF22c55e).withValues(alpha: 0.6),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Container(
-                                    width: 28,
-                                    height: 1,
-                                    color: const Color(0xFF3d4a5e).withValues(alpha: 0.5),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 24),
+
+                          // ── Sign Up Link ───────────────────────────────
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -728,7 +865,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                        builder: (_) => const RegisterScreen()),
+                                        builder: (_) =>
+                                            const RegisterScreen()),
                                   ).then((_) {
                                     _checkBiometricToken();
                                   });
@@ -751,6 +889,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                 ),
               ),
             ),
+
+            // ── Global loading overlay ─────────────────────────────────
             if (authState is AuthLoading)
               Container(
                 color: Colors.black.withValues(alpha: 0.7),
@@ -760,10 +900,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                     decoration: BoxDecoration(
                       color: const Color(0xFF252d3a),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF3d4d6b), width: 0.5),
+                      border: Border.all(
+                          color: const Color(0xFF3d4d6b), width: 0.5),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF22c55e).withValues(alpha: 0.1),
+                          color: const Color(0xFF22c55e)
+                              .withValues(alpha: 0.1),
                           blurRadius: 40,
                         )
                       ],
@@ -772,7 +914,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF22c55e)),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              Color(0xFF22c55e)),
                           strokeWidth: 3.0,
                         ),
                         const SizedBox(height: 16),
@@ -805,25 +948,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       suffixIcon: suffixIcon,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide:
-            BorderSide(color: const Color(0xFF3d4a5e).withValues(alpha: 0.5), width: 0.5),
+        borderSide: BorderSide(
+            color: const Color(0xFF3d4a5e).withValues(alpha: 0.5),
+            width: 0.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide:
-            BorderSide(color: const Color(0xFF3d4a5e).withValues(alpha: 0.5), width: 0.5),
+        borderSide: BorderSide(
+            color: const Color(0xFF3d4a5e).withValues(alpha: 0.5),
+            width: 0.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF22c55e), width: 1),
+        borderSide:
+            const BorderSide(color: Color(0xFF22c55e), width: 1),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+        borderSide:
+            const BorderSide(color: Colors.redAccent, width: 1),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+        borderSide:
+            const BorderSide(color: Colors.redAccent, width: 1),
       ),
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

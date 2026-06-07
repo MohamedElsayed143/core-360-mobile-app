@@ -17,11 +17,16 @@ class WorkoutsDashboardScreen extends ConsumerStatefulWidget {
   const WorkoutsDashboardScreen({super.key});
 
   @override
-  ConsumerState<WorkoutsDashboardScreen> createState() => _WorkoutsDashboardScreenState();
+  ConsumerState<WorkoutsDashboardScreen> createState() =>
+      _WorkoutsDashboardScreenState();
 }
 
-class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScreen> {
+class _WorkoutsDashboardScreenState
+    extends ConsumerState<WorkoutsDashboardScreen> {
   String? _expandedRoutineId;
+
+  // ── Guards duplicate navigation to the AI wizard ──────────────────────
+  bool _isNavigatingToAi = false;
 
   Future<void> _launchVideo(String urlString) async {
     if (urlString.isEmpty) return;
@@ -42,12 +47,24 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
 
   void _toggleExpand(String id) {
     setState(() {
-      if (_expandedRoutineId == id) {
-        _expandedRoutineId = null;
-      } else {
-        _expandedRoutineId = id;
-      }
+      _expandedRoutineId = (_expandedRoutineId == id) ? null : id;
     });
+  }
+
+  /// Navigates to the AI wizard exactly once per tap sequence.
+  /// The flag is reset after the pushed route returns, so the user
+  /// can open the wizard again on a subsequent tap.
+  Future<void> _openAiWizard() async {
+    if (_isNavigatingToAi) return;
+    setState(() => _isNavigatingToAi = true);
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AiPlannerWizardScreen()),
+      );
+    } finally {
+      if (mounted) setState(() => _isNavigatingToAi = false);
+    }
   }
 
   @override
@@ -71,12 +88,14 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textSub, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new,
+              color: AppTheme.textSub, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.download_for_offline_outlined, color: AppTheme.cyberCyan, size: 24),
+            icon: const Icon(Icons.download_for_offline_outlined,
+                color: AppTheme.cyberCyan, size: 24),
             tooltip: 'Import Share Code',
             onPressed: () {
               showDialog(
@@ -129,35 +148,30 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const RoutineBuilderScreen(),
+                                builder: (context) =>
+                                    const RoutineBuilderScreen(),
                               ),
                             );
                           },
                         ),
                       ),
                       const SizedBox(width: 16),
-                      // AI planner
+                      // AI planner — guarded against double-tap
                       Expanded(
                         child: _buildDashboardHeaderButton(
                           title: 'GENERATE PLAN',
                           subtitle: 'AI Biometric Split',
                           icon: Icons.auto_awesome,
                           color: AppTheme.amethystPurple,
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const AiPlannerWizardScreen(),
-                              ),
-                            );
-                          },
+                          // Null while navigating disables the InkWell
+                          onPressed: _isNavigatingToAi ? null : _openAiWizard,
                         ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
-                
+
                 // Neural Pose Analysis Camera Banner
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -167,7 +181,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.electricBlue.withValues(alpha: 0.12),
+                          color:
+                              AppTheme.electricBlue.withValues(alpha: 0.12),
                           blurRadius: 10,
                           spreadRadius: 1,
                         ),
@@ -180,20 +195,24 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const PoseAnalysisScreen(),
+                              builder: (context) =>
+                                  const PoseAnalysisScreen(),
                             ),
                           );
                         },
                         borderRadius: BorderRadius.circular(16),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 14),
                           child: Row(
                             children: [
-                              const Icon(Icons.camera_enhance_outlined, color: Colors.white, size: 22),
+                              const Icon(Icons.camera_enhance_outlined,
+                                  color: Colors.white, size: 22),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       'NEURAL POSE ANALYSIS CAMERA',
@@ -215,7 +234,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.chevron_right, color: Colors.white70, size: 16),
+                              const Icon(Icons.chevron_right,
+                                  color: Colors.white70, size: 16),
                             ],
                           ),
                         ),
@@ -226,7 +246,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                 const SizedBox(height: 24),
 
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Text(
                     'YOUR SAVED ROUTINES',
                     style: GoogleFonts.outfit(
@@ -243,7 +264,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                 Expanded(
                   child: routinesAsync.when(
                     loading: () => const Center(
-                      child: CircularProgressIndicator(color: AppTheme.cyberCyan),
+                      child: CircularProgressIndicator(
+                          color: AppTheme.cyberCyan),
                     ),
                     error: (err, stack) => Center(
                       child: Container(
@@ -252,10 +274,14 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                         decoration: BoxDecoration(
                           color: AppTheme.darkSurface,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3), width: 1.2),
+                          border: Border.all(
+                              color:
+                                  Colors.redAccent.withValues(alpha: 0.3),
+                              width: 1.2),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.redAccent.withValues(alpha: 0.05),
+                              color:
+                                  Colors.redAccent.withValues(alpha: 0.05),
                               blurRadius: 20,
                             ),
                           ],
@@ -263,7 +289,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
+                            const Icon(Icons.error_outline,
+                                color: Colors.redAccent, size: 40),
                             const SizedBox(height: 16),
                             Text(
                               'ERROR LOADING ROUTINES',
@@ -276,25 +303,34 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              err.toString().contains('composite index') 
+                              err.toString().contains('composite index')
                                   ? 'Firestore requires a composite index. We have optimized collections locally to prevent this error.'
                                   : err.toString(),
                               textAlign: TextAlign.center,
-                              style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 11, height: 1.4),
+                              style: GoogleFonts.outfit(
+                                  color: AppTheme.textSub,
+                                  fontSize: 11,
+                                  height: 1.4),
                             ),
                             const SizedBox(height: 20),
                             ElevatedButton.icon(
                               onPressed: () {
-                                ref.read(userRoutinesProvider.notifier).refresh();
+                                ref
+                                    .read(userRoutinesProvider.notifier)
+                                    .refresh();
                               },
-                              icon: const Icon(Icons.refresh, size: 16, color: AppTheme.cyberCyan),
-                              label: Text('RETRY', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                              icon: const Icon(Icons.refresh,
+                                  size: 16, color: AppTheme.cyberCyan),
+                              label: Text('RETRY',
+                                  style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.bold)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppTheme.darkBackground,
                                 foregroundColor: AppTheme.cyberCyan,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  side: const BorderSide(color: AppTheme.cardBorderColor),
+                                  side: const BorderSide(
+                                      color: AppTheme.cardBorderColor),
                                 ),
                               ),
                             ),
@@ -306,15 +342,18 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                       if (routines.isEmpty) {
                         return _buildEmptyState(context);
                       }
-                      
+
                       return ListView.builder(
                         physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                        padding:
+                            const EdgeInsets.fromLTRB(24, 0, 24, 24),
                         itemCount: routines.length,
                         itemBuilder: (context, index) {
                           final routine = routines[index];
-                          final isExpanded = _expandedRoutineId == routine.id;
-                          return _buildRoutineCard(context, routine, isExpanded, workoutsAsync.value);
+                          final isExpanded =
+                              _expandedRoutineId == routine.id;
+                          return _buildRoutineCard(context, routine,
+                              isExpanded, workoutsAsync.value);
                         },
                       );
                     },
@@ -333,50 +372,55 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
     required String subtitle,
     required IconData icon,
     required Color color,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed, // nullable — null = visually disabled
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.02),
-            blurRadius: 15,
-          )
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
+    final isDisabled = onPressed == null;
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: isDisabled ? 0.5 : 1.0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.darkSurface,
           borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(18.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, color: color, size: 24),
-                const SizedBox(height: 12),
-                Text(
-                  title,
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
+          border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.02),
+              blurRadius: 15,
+            )
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(18.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, color: color, size: 24),
+                  const SizedBox(height: 12),
+                  Text(
+                    title,
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.outfit(
-                    fontSize: 9,
-                    color: AppTheme.textSub,
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.outfit(
+                      fontSize: 9,
+                      color: AppTheme.textSub,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -390,7 +434,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.fitness_center_outlined, color: Colors.white10, size: 64),
+          const Icon(Icons.fitness_center_outlined,
+              color: Colors.white10, size: 64),
           const SizedBox(height: 16),
           Text(
             'YOUR WORKOUT LIBRARY IS EMPTY',
@@ -419,9 +464,12 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
     );
   }
 
-  Widget _buildRoutineCard(BuildContext context, Routine routine, bool isExpanded, List<Exercise>? globalExercises) {
-    final borderColor = routine.isAiGenerated ? AppTheme.amethystPurple : AppTheme.cyberCyan;
-    
+  Widget _buildRoutineCard(BuildContext context, Routine routine,
+      bool isExpanded, List<Exercise>? globalExercises) {
+    final borderColor = routine.isAiGenerated
+        ? AppTheme.amethystPurple
+        : AppTheme.cyberCyan;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -437,7 +485,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
         children: [
           ListTile(
             onTap: () => _toggleExpand(routine.id),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
             title: Text(
               routine.name,
               style: GoogleFonts.outfit(
@@ -460,11 +509,15 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                 const SizedBox(width: 8),
                 if (routine.isAiGenerated)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppTheme.amethystPurple.withValues(alpha: 0.1),
+                      color:
+                          AppTheme.amethystPurple.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppTheme.amethystPurple.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color: AppTheme.amethystPurple
+                              .withValues(alpha: 0.3)),
                     ),
                     child: Text(
                       'AI GENERATED',
@@ -477,11 +530,14 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                   )
                 else
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppTheme.cyberCyan.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppTheme.cyberCyan.withValues(alpha: 0.2)),
+                      border: Border.all(
+                          color:
+                              AppTheme.cyberCyan.withValues(alpha: 0.2)),
                     ),
                     child: Text(
                       'CUSTOM',
@@ -495,15 +551,16 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
               ],
             ),
             trailing: Icon(
-              isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+              isExpanded
+                  ? Icons.keyboard_arrow_up
+                  : Icons.keyboard_arrow_down,
               color: AppTheme.textMuted,
             ),
           ),
 
           if (isExpanded) ...[
             const Divider(color: AppTheme.cardBorderColor, height: 1),
-            
-            // Exercises list preview
+
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -511,7 +568,10 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                 children: [
                   ...routine.exercises.map((ex) {
                     final matchingExercise = globalExercises?.firstWhere(
-                      (e) => e.id == ex.workoutId || e.title.toLowerCase().trim() == ex.title.toLowerCase().trim(),
+                      (e) =>
+                          e.id == ex.workoutId ||
+                          e.title.toLowerCase().trim() ==
+                              ex.title.toLowerCase().trim(),
                       orElse: () => Exercise(
                         id: '',
                         title: ex.title,
@@ -524,13 +584,16 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                       ),
                     );
                     final gifUrl = matchingExercise?.gifUrl ?? '';
-                    final thumbnailUrl = matchingExercise?.thumbnailUrl ?? '';
+                    final thumbnailUrl =
+                        matchingExercise?.thumbnailUrl ?? '';
                     final videoUrl = matchingExercise?.videoUrl ?? '';
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12.0),
                       child: InkWell(
-                        onTap: videoUrl.isNotEmpty ? () => _launchVideo(videoUrl) : null,
+                        onTap: videoUrl.isNotEmpty
+                            ? () => _launchVideo(videoUrl)
+                            : null,
                         borderRadius: BorderRadius.circular(8),
                         child: Row(
                           children: [
@@ -544,7 +607,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
@@ -554,9 +618,11 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                                           style: GoogleFonts.outfit(
                                             fontSize: 13,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.white.withValues(alpha: 0.9),
+                                            color: Colors.white
+                                                .withValues(alpha: 0.9),
                                           ),
-                                          overflow: TextOverflow.ellipsis,
+                                          overflow:
+                                              TextOverflow.ellipsis,
                                         ),
                                       ),
                                       if (videoUrl.isNotEmpty) ...[
@@ -574,7 +640,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                                     ex.targetMuscle.toUpperCase(),
                                     style: GoogleFonts.outfit(
                                       fontSize: 9,
-                                      color: AppTheme.cyberCyan.withValues(alpha: 0.8),
+                                      color: AppTheme.cyberCyan
+                                          .withValues(alpha: 0.8),
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.5,
                                     ),
@@ -583,11 +650,13 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: AppTheme.glassFillColor,
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: AppTheme.cardBorderColor),
+                                border: Border.all(
+                                    color: AppTheme.cardBorderColor),
                               ),
                               child: Text(
                                 '${ex.sets.length} SETS',
@@ -606,13 +675,14 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
 
                   const SizedBox(height: 16),
 
-                  // ── START TRACKING SESSION BUTTON ─────────────────
+                  // ── START TRACKING SESSION BUTTON ──────────────────
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ActiveWorkoutScreen(routine: routine),
+                          builder: (context) =>
+                              ActiveWorkoutScreen(routine: routine),
                         ),
                       );
                     },
@@ -632,7 +702,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 20),
+                          const Icon(Icons.play_arrow_rounded,
+                              color: Colors.black, size: 20),
                           const SizedBox(width: 8),
                           Text(
                             'START TRACKING SESSION',
@@ -655,33 +726,35 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      // Edit
                       IconButton(
-                        icon: const Icon(Icons.edit_note, color: AppTheme.textSub, size: 20),
+                        icon: const Icon(Icons.edit_note,
+                            color: AppTheme.textSub, size: 20),
                         tooltip: 'Edit Routine',
                         onPressed: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => RoutineBuilderScreen(existingRoutine: routine),
+                              builder: (context) => RoutineBuilderScreen(
+                                  existingRoutine: routine),
                             ),
                           );
                         },
                       ),
-                      // Share
                       IconButton(
-                        icon: const Icon(Icons.share_outlined, color: AppTheme.cyberCyan, size: 18),
+                        icon: const Icon(Icons.share_outlined,
+                            color: AppTheme.cyberCyan, size: 18),
                         tooltip: 'Share Routine',
                         onPressed: () {
                           showDialog(
                             context: context,
-                            builder: (context) => ShareImportDialog(routineToShare: routine),
+                            builder: (context) =>
+                                ShareImportDialog(routineToShare: routine),
                           );
                         },
                       ),
-                      // Delete
                       IconButton(
-                        icon: const Icon(Icons.delete_forever_outlined, color: Colors.redAccent, size: 18),
+                        icon: const Icon(Icons.delete_forever_outlined,
+                            color: Colors.redAccent, size: 18),
                         tooltip: 'Delete Routine',
                         onPressed: () => _confirmDelete(routine),
                       ),
@@ -707,7 +780,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
         ),
         title: Text(
           'DELETE ROUTINE?',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
+          style: GoogleFonts.outfit(
+              fontWeight: FontWeight.bold, color: Colors.white),
         ),
         content: Text(
           'Are you sure you want to permanently delete "${routine.name}"?',
@@ -717,25 +791,30 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
           TextButton(
             child: Text(
               'CANCEL',
-              style: GoogleFonts.outfit(color: AppTheme.textMuted, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(
+                  color: AppTheme.textMuted, fontWeight: FontWeight.bold),
             ),
             onPressed: () => Navigator.pop(dialogContext),
           ),
           TextButton(
             child: Text(
               'DELETE',
-              style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(
+                  color: Colors.redAccent, fontWeight: FontWeight.bold),
             ),
             onPressed: () async {
               Navigator.pop(dialogContext);
               try {
-                await ref.read(userRoutinesProvider.notifier).deleteRoutine(routine.id);
+                await ref
+                    .read(userRoutinesProvider.notifier)
+                    .deleteRoutine(routine.id);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
                         'ROUTINE DELETED.',
-                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                        style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold),
                       ),
                       backgroundColor: Colors.redAccent,
                     ),
@@ -747,7 +826,8 @@ class _WorkoutsDashboardScreenState extends ConsumerState<WorkoutsDashboardScree
                     SnackBar(
                       content: Text(
                         'DELETE FAILED: $e',
-                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                        style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold),
                       ),
                       backgroundColor: Colors.redAccent,
                     ),

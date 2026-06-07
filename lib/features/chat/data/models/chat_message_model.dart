@@ -92,6 +92,15 @@ class ChatMessageModel {
         return _ParsedProposal(text, null);
       }
     }
+
+    // During streaming the closing tag may not have arrived yet.
+    // Strip everything from [PLAN_PROPOSAL] onwards so raw JSON never shows.
+    final openTagIdx = text.indexOf('[PLAN_PROPOSAL]');
+    if (openTagIdx != -1) {
+      final beforeProposal = text.substring(0, openTagIdx).trim();
+      return _ParsedProposal(beforeProposal, null);
+    }
+
     return _ParsedProposal(text, null);
   }
 

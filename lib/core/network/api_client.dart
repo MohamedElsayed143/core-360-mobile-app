@@ -9,6 +9,7 @@ import '../../features/workouts/data/models/ai_workout_models.dart';
 import '../../features/chat/data/models/chat_message_model.dart';
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:math';
 
 class ApiClient {
   final Dio _dio;
@@ -48,7 +49,6 @@ class ApiClient {
   Future<Map<String, WorkoutData>> _fetchWorkoutsLibrary() async {
     if (_workoutsCache != null) return _workoutsCache!;
     if (_isFetchingWorkouts) {
-      // Wait for ongoing fetch
       await Future.delayed(const Duration(milliseconds: 200));
       return _workoutsCache ?? {};
     }
@@ -100,12 +100,12 @@ class ApiClient {
     return '';
   }
 
-  /// Get dynamic animated exercise GIF URL (interfaces with ExerciseDB API or falls back to robust direct GIF links)
+  /// Get dynamic animated exercise GIF URL
   Future<String> getWorkoutGifUrl(String title) async {
     final sanitizedTitle = title.trim().toLowerCase();
     if (sanitizedTitle.isEmpty) return '';
 
-    // 0. Try to load from assets/workouts.json first where we mapped high-performance Cloudfront URLs
+    // 0. Try to load from assets/workouts.json first
     String videoUrl = '';
     try {
       final String jsonContent = await rootBundle.loadString('assets/workouts.json');
@@ -172,7 +172,7 @@ class ApiClient {
       } catch (_) {}
     }
 
-    // 3. High-fidelity Dynamic direct GIF link fallback (GitHub free-exercise-db format)
+    // 3. Dynamic direct GIF link fallback
     final formattedName = sanitizedTitle
         .replaceAll(RegExp(r'[^a-z0-9\s-]'), '')
         .replaceAll(RegExp(r'\s+'), '-');
@@ -199,6 +199,7 @@ class ApiClient {
     }
     return null;
   }
+
   /// Personalized AI Workout Planner (POST /api/ai-workout)
   Future<AiWorkoutResponse> generateAiWorkout(AiWorkoutRequest request) async {
     try {
@@ -233,9 +234,9 @@ class ApiClient {
         );
       }
       debugPrint(
-        'Error generating workout: $e. Falling back to local AI simulator.',
+        'Error generating workout: $e. Falling back to improved local AI simulator.',
       );
-      return _generateSimulatedWorkoutResponse(request);
+      return _generateImprovedSimulatedWorkoutResponse(request);
     }
   }
 
@@ -245,116 +246,178 @@ class ApiClient {
     Map<String, dynamic>? healthMetrics,
     Map<String, dynamic>? activeSessionLogs,
   }) async* {
-    final payload = {
-      'messages': messages
-          .map(
-            (m) => {
-              'role': m.role,
-              'content': m.planProposal != null
-                  ? '${m.content}\n[PLAN_PROPOSAL]\n${jsonEncode(m.planProposal!.toJson())}\n[/PLAN_PROPOSAL]'
-                  : m.content,
-            },
-          )
-          .toList(),
-      if (healthMetrics != null) 'healthMetrics': healthMetrics,
-      if (activeSessionLogs != null) 'activeSessionLogs': activeSessionLogs,
-    };
+    final buf = StringBuffer();
+    buf.writeln('You are an elite, bilingual (English/Arabic) personal fitness coach.');
+    buf.writeln('Respond ONLY in the same language the user writes in.');
+    buf.writeln('Keep answers concise but action-oriented.');
 
-    bool yieldedAny = false;
+    if (healthMetrics != null) {
+      buf.writeln('\n## User Profile');
+      buf.writeln('- Weight: ${healthMetrics['weight'] ?? 'unknown'} kg');
+      buf.writeln('- Height: ${healthMetrics['height'] ?? 'unknown'} cm');
+      buf.writeln('- Age: ${healthMetrics['age'] ?? 'unknown'}');
+      buf.writeln('- Goals: ${(healthMetrics['goals'] as List?)?.join(', ') ?? 'General Fitness'}');
+      buf.writeln('- Injuries/Limitations: ${healthMetrics['injuries'] ?? 'None'}');
+      if (healthMetrics['bodyFat'] != null) buf.writeln('- Body Fat: ${healthMetrics['bodyFat']}%');
+      if (healthMetrics['muscleMass'] != null) buf.writeln('- Muscle Mass: ${healthMetrics['muscleMass']} kg');
+    }
+
+    if (activeSessionLogs != null) {
+      buf.writeln('\n## Recent Activity');
+      buf.writeln('- Sessions completed: ${activeSessionLogs['completedSessions'] ?? 0}');
+      buf.writeln('- Total volume lifted: ${activeSessionLogs['totalVolume'] ?? 0} kg');
+      buf.writeln('- Average accuracy: ${activeSessionLogs['averageAccuracy'] ?? 0}%');
+      buf.writeln('- Total training minutes: ${activeSessionLogs['totalMinutes'] ?? 0}');
+    }
+
+    buf.writeln('\nWhen proposing a workout plan, wrap the JSON in [PLAN_PROPOSAL]...[/PLAN_PROPOSAL] tags.');
+    buf.writeln('Format: {"name":"...", "exercises":[{"workoutId":"...","title":"...","sets":[{"reps":N,"kg":N}],"order":N}]}');
+
+    final systemMessage = {'role': 'system', 'content': buf.toString()};
+    final messagesPayload = [
+      systemMessage,
+      ...messages.map((m) => {
+        'role': m.role,
+        'content': m.planProposal != null
+            ? '${m.content}\n[PLAN_PROPOSAL]\n${jsonEncode(m.planProposal!.toJson())}\n[/PLAN_PROPOSAL]'
+            : m.content,
+      }),
+    ];
+
+    debugPrint('🌐 streamChat → POST ${ApiConstants.baseUrl}${ApiConstants.chat}');
 
     try {
       final response = await _dio.post<ResponseBody>(
         ApiConstants.chat,
-        data: payload,
+        data: {'messages': messagesPayload},
         options: Options(
           responseType: ResponseType.stream,
-          headers: {
-            'Accept': 'text/event-stream',
-            'Content-Type': 'application/json',
-          },
+          headers: {'Accept': 'text/event-stream', 'Content-Type': 'application/json'},
         ),
       );
 
+      bool yieldedAny = false;
       final stream = response.data!.stream
           .cast<List<int>>()
           .transform(utf8.decoder)
           .transform(const LineSplitter())
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 30));
 
       await for (final line in stream) {
         if (line.startsWith('data: ')) {
           final data = line.substring(6).trim();
-          if (data == '[DONE]') {
-            break;
-          }
+          if (data == '[DONE]') break;
           try {
             final decoded = jsonDecode(data);
-            if (decoded is Map) {
-              final content =
-                  decoded['content'] ??
-                  decoded['choices']?[0]?['delta']?['content'] ??
-                  '';
-              if (content.toString().isNotEmpty) {
-                yieldedAny = true;
-                yield content.toString();
-              }
-            } else {
+            final content = (decoded is Map)
+                ? (decoded['content'] ?? decoded['choices']?[0]?['delta']?['content'] ?? '')
+                : data;
+            if (content.toString().isNotEmpty) {
               yieldedAny = true;
-              yield data;
+              yield content.toString();
             }
           } catch (_) {
             yieldedAny = true;
             yield data;
           }
-        } else if (line.isNotEmpty) {
-          if (line.startsWith('0:')) {
+        } else if (line.startsWith('0:')) {
             final content = line.substring(2).trim();
-            if (content.startsWith('"') &&
-                content.endsWith('"') &&
-                content.length > 1) {
-              try {
-                final unescaped = jsonDecode(content) as String;
-                yieldedAny = true;
-                yield unescaped;
-              } catch (_) {
-                yieldedAny = true;
-                yield content;
-              }
-            } else {
-              yieldedAny = true;
-              yield content;
-            }
-          } else {
+            final unescaped = (content.startsWith('"') && content.endsWith('"')) 
+              ? jsonDecode(content) as String : content;
             yieldedAny = true;
-            yield line;
-          }
+            yield unescaped;
         }
       }
 
       if (!yieldedAny) {
-        debugPrint(
-          'Backend chat stream returned empty. Falling back to local RAG AI Coach.',
+        debugPrint('⚠️ Vercel backend returned empty stream — trying Groq direct...');
+        yield* _streamDirectGroq(
+          messagesPayload,
+          healthMetrics: healthMetrics,
+          activeSessionLogs: activeSessionLogs,
+          messages: messages,
         );
-        yield* streamSimulatedChatResponse(
+      }
+    } catch (e) {
+      debugPrint('❌ Vercel streamChat failed — trying Groq direct. Error: $e');
+      yield* _streamDirectGroq(
+        messagesPayload,
+        healthMetrics: healthMetrics,
+        activeSessionLogs: activeSessionLogs,
+        messages: messages,
+      );
+    }
+  }
+
+  /// Direct Groq Cloud streaming — bypasses Vercel, uses compile-time GROQ_API_KEY.
+  /// Falls through to local simulator if key is absent or Groq fails.
+  Stream<String> _streamDirectGroq(
+    List<Map<String, dynamic>> messagesPayload, {
+    Map<String, dynamic>? healthMetrics,
+    Map<String, dynamic>? activeSessionLogs,
+    List<ChatMessageModel> messages = const [],
+  }) async* {
+    final groqKey = const String.fromEnvironment('GROQ_API_KEY');
+
+    if (groqKey.isEmpty || groqKey == 'MOCK_MODE') {
+      debugPrint('⚠️ No GROQ_API_KEY — using local RAG simulator.');
+      yield* _streamImprovedSimulatedChatResponse(
+        messages,
+        healthMetrics: healthMetrics,
+        activeSessionLogs: activeSessionLogs,
+      );
+      return;
+    }
+
+    try {
+      final groqDio = Dio();
+      final response = await groqDio.post<ResponseBody>(
+        'https://api.groq.com/openai/v1/chat/completions',
+        data: {
+          'model': 'llama-3.3-70b-versatile',
+          'messages': messagesPayload,
+          'stream': true,
+          'temperature': 0.7,
+        },
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: {
+            'Authorization': 'Bearer $groqKey',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      bool yieldedAny = false;
+      final stream = response.data!.stream
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+
+      await for (final line in stream) {
+        if (line.startsWith('data: ')) {
+          final data = line.substring(6).trim();
+          if (data == '[DONE]') break;
+          try {
+            final decoded = jsonDecode(data) as Map<String, dynamic>;
+            final content = decoded['choices']?[0]?['delta']?['content'] as String?;
+            if (content != null && content.isNotEmpty) {
+              yieldedAny = true;
+              yield content;
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (!yieldedAny) {
+        yield* _streamImprovedSimulatedChatResponse(
           messages,
           healthMetrics: healthMetrics,
           activeSessionLogs: activeSessionLogs,
         );
       }
     } catch (e) {
-      if (e is DioException) {
-        developer.log(
-          'DioException in streamChat: [Type: ${e.type}] [Status: ${e.response?.statusCode}] [Body: ${e.response?.data}] [Msg: ${e.message}]',
-          name: 'ApiClient',
-          error: e,
-        );
-      } else {
-        developer.log('Error streaming chat: $e', name: 'ApiClient', error: e);
-      }
-      debugPrint(
-        'Error streaming chat: $e. Falling back to local RAG AI Coach.',
-      );
-      yield* streamSimulatedChatResponse(
+      yield* _streamImprovedSimulatedChatResponse(
         messages,
         healthMetrics: healthMetrics,
         activeSessionLogs: activeSessionLogs,
@@ -382,132 +445,142 @@ class ApiClient {
     } else if (lower.contains('deadlift')) {
       return 'https://www.youtube.com/watch?v=XowK9_K25VA';
     }
-    // Generic backup workout tutorial
     return 'https://www.youtube.com/watch?v=aclHkVaku9U';
   }
 
-  /// High-fidelity local AI workout plan generator fallback (now uses corrected video URLs)
-  AiWorkoutResponse _generateSimulatedWorkoutResponse(
+  // =========================================================================
+  // IMPROVED SIMULATED WORKOUT GENERATOR (more precise, respects all parameters)
+  // =========================================================================
+  AiWorkoutResponse _generateImprovedSimulatedWorkoutResponse(
     AiWorkoutRequest request,
   ) {
     final lowerFocus = request.focus.toLowerCase();
-    String routineName = 'AI Cyber-Plat ${request.focus}';
-    String summary =
-        'A biomechanically optimized routine tailored for ${request.experience} level targeting ${request.focus} with a goal of ${request.goal}.';
-    List<AiWorkoutExercise> exercises = [];
-    List<String> warnings = [];
-
-    if (request.injuries.toLowerCase() != 'none') {
-      warnings.add(
-        'Form adjustment active: Avoid overloading joints affected by injury: ${request.injuries}.',
-      );
-    }
-    warnings.add('Ensure camera scanning is active during deep flexions.');
-
-    if (lowerFocus.contains('push') ||
-        lowerFocus.contains('chest') ||
-        lowerFocus.contains('upper')) {
-      routineName = 'Neural Upper Push Core';
-      final hasShoulderInjury = request.injuries.toLowerCase().contains('shoulder');
-      exercises = [
-        if (!hasShoulderInjury)
-          AiWorkoutExercise(
-            name: 'Barbell Bench Press',
-            sets: 4,
-            reps: '10 reps',
-            weightKg: '40 kg',
-            rest: '90s',
-            notes:
-                'Keep shoulders retracted. Scan alignment path with camera overlay.',
-          ),
-        AiWorkoutExercise(
-          name: 'Push-Up',
-          sets: 3,
-          reps: '12 reps',
-          weightKg: 'Bodyweight',
-          rest: '60s',
-          notes: 'Full lock at top. Keep core tight.',
-        ),
-        AiWorkoutExercise(
-          name: 'Overhead Dumbbell Tricep Extension',
-          sets: 3,
-          reps: '10 reps',
-          weightKg: '10 kg',
-          rest: '60s',
-          notes: 'Avoid elbow flaring.',
-        ),
-      ];
-    } else if (lowerFocus.contains('pull') || lowerFocus.contains('back')) {
-      routineName = 'Neural Pull & Lats Developer';
-      exercises = [
-        AiWorkoutExercise(
-          name: 'Pull-Up',
-          sets: 4,
-          reps: '8 reps',
-          weightKg: 'Bodyweight',
-          rest: '90s',
-          notes: 'Drive elbows down, squeeze shoulder blades.',
-        ),
-        AiWorkoutExercise(
-          name: 'Push-Up',
-          sets: 3,
-          reps: '12 reps',
-          weightKg: 'Bodyweight',
-          rest: '60s',
-          notes: 'Secondary compound pull support core lock.',
-        ),
-      ];
-    } else if (lowerFocus.contains('leg') || lowerFocus.contains('lower') || lowerFocus.contains('quad')) {
-      routineName = 'Neural Lower Body Optimizer';
-      exercises = [
-        AiWorkoutExercise(
-          name: 'Bodyweight Squat',
-          sets: 4,
-          reps: '12 reps',
-          weightKg: 'Bodyweight',
-          rest: '90s',
-          notes: 'Sit deep. Keep back straight and check hip flexion on pose analyzer.',
-        ),
-        AiWorkoutExercise(
-          name: 'Standing Calf Raise',
-          sets: 3,
-          reps: '15 reps',
-          weightKg: '10 kg',
-          rest: '60s',
-          notes: 'Full extension at top.',
-        ),
-      ];
+    final experience = request.experience.toLowerCase();
+    final frequency = request.frequency.toLowerCase();
+    final hasInjuries = request.injuries.toLowerCase() != 'none';
+    final injuryList = hasInjuries ? request.injuries.toLowerCase() : '';
+    
+    // Determine number of exercises based on frequency (more days = more variety)
+    int exerciseCount = 4;
+    if (frequency.contains('6')) {
+      exerciseCount = 6;
+    } else if (frequency.contains('5')) {
+      exerciseCount = 5;
+    } else if (frequency.contains('4')) {
+      exerciseCount = 4;
     } else {
-      // Default Full Body
-      routineName = 'AI 360 Full Body Calibrator';
-      exercises = [
-        AiWorkoutExercise(
-          name: 'Bodyweight Squat',
-          sets: 3,
-          reps: '12 reps',
-          weightKg: 'Bodyweight',
-          rest: '90s',
-          notes: 'Sit deep, hips past knees.',
-        ),
-        AiWorkoutExercise(
-          name: 'Push-Up',
-          sets: 3,
-          reps: '12 reps',
-          weightKg: 'Bodyweight',
-          rest: '60s',
-          notes: 'Keep straight back alignment.',
-        ),
-        AiWorkoutExercise(
-          name: 'Forearm Plank',
-          sets: 3,
-          reps: '60 seconds',
-          weightKg: 'Bodyweight',
-          rest: '45s',
-          notes: 'Hold flat body alignment. Engage core.',
-        ),
-      ];
+      exerciseCount = 3;
     }
-
+    
+    // Adjust sets/reps based on experience
+    int setsBase = 3;
+    int repsBase = 12;
+    if (experience.contains('advanced')) {
+      setsBase = 4;
+      repsBase = 10;
+    } else if (experience.contains('intermediate')) {
+      setsBase = 3;
+      repsBase = 12;
+    } else {
+      setsBase = 3;
+      repsBase = 10;
+    }
+    
+    // Exercise pool
+    final allExercises = {
+      'push': [
+        {'name': 'Barbell Bench Press', 'target': 'chest', 'injuryRisk': 'shoulder'},
+        {'name': 'Push-Up', 'target': 'chest', 'injuryRisk': 'wrist'},
+        {'name': 'Overhead Dumbbell Tricep Extension', 'target': 'triceps', 'injuryRisk': 'elbow'},
+        {'name': 'Incline Dumbbell Press', 'target': 'upper chest', 'injuryRisk': 'shoulder'},
+        {'name': 'Diamond Push-Up', 'target': 'triceps', 'injuryRisk': 'wrist'},
+        {'name': 'Cable Fly', 'target': 'chest', 'injuryRisk': 'shoulder'},
+      ],
+      'pull': [
+        {'name': 'Pull-Up', 'target': 'back', 'injuryRisk': 'shoulder'},
+        {'name': 'Lat Pulldown', 'target': 'back', 'injuryRisk': 'shoulder'},
+        {'name': 'Seated Cable Row', 'target': 'back', 'injuryRisk': 'lower back'},
+        {'name': 'Bent Over Row', 'target': 'back', 'injuryRisk': 'lower back'},
+        {'name': 'Face Pull', 'target': 'rear delt', 'injuryRisk': 'shoulder'},
+        {'name': 'Dumbbell Curl', 'target': 'biceps', 'injuryRisk': 'elbow'},
+      ],
+      'legs': [
+        {'name': 'Bodyweight Squat', 'target': 'quadriceps', 'injuryRisk': 'knee'},
+        {'name': 'Romanian Deadlift', 'target': 'hamstring', 'injuryRisk': 'lower back'},
+        {'name': 'Walking Lunge', 'target': 'quadriceps', 'injuryRisk': 'knee'},
+        {'name': 'Standing Calf Raise', 'target': 'calves', 'injuryRisk': 'ankle'},
+        {'name': 'Leg Press', 'target': 'quadriceps', 'injuryRisk': 'knee'},
+        {'name': 'Glute Bridge', 'target': 'glutes', 'injuryRisk': 'lower back'},
+      ],
+      'core': [
+        {'name': 'Plank', 'target': 'abs', 'injuryRisk': 'lower back'},
+        {'name': 'Russian Twist', 'target': 'obliques', 'injuryRisk': 'lower back'},
+        {'name': 'Leg Raise', 'target': 'lower abs', 'injuryRisk': 'lower back'},
+        {'name': 'Mountain Climber', 'target': 'abs', 'injuryRisk': 'wrist'},
+        {'name': 'Bicycle Crunch', 'target': 'obliques', 'injuryRisk': 'neck'},
+      ],
+      'full_body': [
+        {'name': 'Bodyweight Squat', 'target': 'legs', 'injuryRisk': 'knee'},
+        {'name': 'Push-Up', 'target': 'chest', 'injuryRisk': 'wrist'},
+        {'name': 'Pull-Up', 'target': 'back', 'injuryRisk': 'shoulder'},
+        {'name': 'Plank', 'target': 'core', 'injuryRisk': 'lower back'},
+        {'name': 'Lunge', 'target': 'legs', 'injuryRisk': 'knee'},
+        {'name': 'Dumbbell Row', 'target': 'back', 'injuryRisk': 'shoulder'},
+      ],
+    };
+    
+    // Determine focus category
+    List<Map<String, String>> availableExercises = [];
+    if (lowerFocus.contains('push')) {
+      availableExercises = List.from(allExercises['push']!);
+    } else if (lowerFocus.contains('pull')) {
+      availableExercises = List.from(allExercises['pull']!);
+    } else if (lowerFocus.contains('leg') || lowerFocus.contains('lower')) {
+      availableExercises = List.from(allExercises['legs']!);
+    } else if (lowerFocus.contains('core') || lowerFocus.contains('ab')) {
+      availableExercises = List.from(allExercises['core']!);
+    } else {
+      availableExercises = List.from(allExercises['full_body']!);
+    }
+    
+    // Filter out exercises that conflict with injuries
+    if (hasInjuries) {
+      availableExercises = availableExercises.where((ex) {
+        final risk = ex['injuryRisk']!;
+        return !injuryList.contains(risk);
+      }).toList();
+    }
+    
+    // Shuffle and take needed count
+    availableExercises.shuffle(Random());
+    final selected = availableExercises.take(exerciseCount).toList();
+    
+    // If not enough exercises, add defaults
+    if (selected.length < exerciseCount) {
+      selected.addAll([
+        {'name': 'Bodyweight Squat', 'target': 'legs', 'injuryRisk': 'knee'},
+        {'name': 'Push-Up', 'target': 'chest', 'injuryRisk': 'wrist'},
+      ].take(exerciseCount - selected.length));
+    }
+    
+    final exercises = selected.map((ex) {
+      final sets = setsBase + (Random().nextInt(2)); // +/-0 or 1
+      final reps = repsBase + (Random().nextInt(4) - 2); // +/-2
+      final weightKg = experience.contains('beginner') ? 'Bodyweight' : '${(repsBase * 2.5).round()} kg';
+      return AiWorkoutExercise(
+        name: ex['name']!,
+        sets: sets.clamp(2, 5),
+        reps: '${reps.clamp(6, 20)} reps',
+        weightKg: weightKg,
+        rest: setsBase > 3 ? '90s' : '60s',
+        notes: 'Focus on form. ${hasInjuries ? 'Avoid aggravating $injuryList.' : ''}',
+      );
+    }).toList();
+    
+    final routineName = 'AI ${experience.toUpperCase()} ${request.focus} Plan';
+    final summary = 'Personalized $experience level routine for ${request.focus}. Frequency: ${request.frequency}. Goal: ${request.goal}.';
+    final List<String> warnings = hasInjuries ? ['Injury precaution: $injuryList. Modify range of motion.'] : [];
+    
     return AiWorkoutResponse(
       routine: AiWorkoutRoutine(
         routineName: routineName,
@@ -518,123 +591,284 @@ class ApiClient {
     );
   }
 
-  /// High-fidelity local RAG AI Coach chatbot simulator fallback
-  Stream<String> streamSimulatedChatResponse(
+  // =========================================================================
+  // IMPROVED SIMULATED CHAT RESPONSE (varied, contextual, non-repetitive)
+  // =========================================================================
+  Stream<String> _streamImprovedSimulatedChatResponse(
     List<ChatMessageModel> messages, {
     Map<String, dynamic>? healthMetrics,
     Map<String, dynamic>? activeSessionLogs,
   }) async* {
     final userPrompt = messages.isNotEmpty ? messages.last.content : '';
     final lowerPrompt = userPrompt.toLowerCase();
-    final isArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(userPrompt);
 
-    // Dynamic metrics text for personalization
-    final goals = healthMetrics?['goals'] as List? ?? ['General Fitness'];
-    final injuries = healthMetrics?['injuries'] as String? ?? 'None';
-    final weight = healthMetrics?['weight']?.toString() ?? '75';
+    // ── Extract real profile values ────────────────────────────────────────
+    final goals = (healthMetrics?['goals'] as List?)?.cast<String>() ?? ['General Fitness'];
+    final injuries   = healthMetrics?['injuries'] as String? ?? 'None';
+    final weightRaw  = healthMetrics?['weight'];
+    final heightRaw  = healthMetrics?['height'];
+    final ageRaw     = healthMetrics?['age'];
+    final weight     = (weightRaw is num) ? weightRaw.toDouble() : double.tryParse(weightRaw?.toString() ?? '') ?? 75.0;
+    final height     = (heightRaw is num) ? heightRaw.toDouble() : double.tryParse(heightRaw?.toString() ?? '') ?? 175.0;
+    final age        = (ageRaw is num) ? ageRaw.toInt() : int.tryParse(ageRaw?.toString() ?? '') ?? 25;
     final completedSessions = activeSessionLogs?['completedSessions']?.toString() ?? '0';
+    final totalVolume       = activeSessionLogs?['totalVolume']?.toString() ?? '0';
+    final hasProfile = healthMetrics != null;
+
+    final random = Random();
+    final signOff = [' Stay strong! 💪', ' Keep pushing! 🔥', ' Train smart! 🧠', " I'm always here for you."];
 
     String responseText = '';
 
-    if (isArabic) {
-      if (lowerPrompt.contains('برنامج') ||
-          lowerPrompt.contains('تمرين') ||
-          lowerPrompt.contains('خطة') ||
-          lowerPrompt.contains('جدول')) {
-        responseText =
-            'أهلاً بك في Core-360! 🌌 لقد قمت بتحليل طلبك وبنيتك البدنية (الوزن: $weight كجم، الإصابات: $injuries)، وأقترح عليك هذه الخطة التدريبية المحسنة للأداء العالي وتفادي الإصابات:\n\n'
-            '[PLAN_PROPOSAL]\n'
-            '{\n'
-            '  "name": "خطة Core-360 للتحمل والفتنس",\n'
-            '  "exercises": [\n'
-            '    {\n'
-            '      "workoutId": "squats_003",\n'
-            '      "title": "Bodyweight Squat",\n'
-            '      "sets": [\n'
-            '        {"reps": 12, "kg": 0.0},\n'
-            '        {"reps": 12, "kg": 0.0},\n'
-            '        {"reps": 12, "kg": 0.0}\n'
-            '      ],\n'
-            '      "order": 0\n'
-            '    },\n'
-            '    {\n'
-            '      "workoutId": "push_ups_002",\n'
-            '      "title": "Push-Up",\n'
-            '      "sets": [\n'
-            '        {"reps": 10, "kg": 0.0},\n'
-            '        {"reps": 10, "kg": 0.0}\n'
-            '      ],\n'
-            '      "order": 1\n'
-            '    },\n'
-            '    {\n'
-            '      "workoutId": "plank_005",\n'
-            '      "title": "Forearm Plank",\n'
-            '      "sets": [\n'
-            '        {"reps": 1, "kg": 0.0}\n'
-            '      ],\n'
-            '      "order": 2\n'
-            '    }\n'
-            '  ]\n'
-            '}\n'
-            '[/PLAN_PROPOSAL]\n\n'
-            'يمكنك إضافة هذا الجدول والبدء فوراً باستخدام الكاميرا الذكية لتحليل المفاصل.';
+    // ── 1. CALORIE / MACRO / NUTRITION (highest priority) ─────────────────
+    final isNutritionQuery = lowerPrompt.contains('calorie') || lowerPrompt.contains('calori') ||
+        lowerPrompt.contains('macro') || lowerPrompt.contains('ماكرو') ||
+        lowerPrompt.contains('كالوري') || lowerPrompt.contains('protein') ||
+        lowerPrompt.contains('carb') || lowerPrompt.contains('fat') ||
+        lowerPrompt.contains('tdee') || lowerPrompt.contains('bmr') ||
+        lowerPrompt.contains('diet') || lowerPrompt.contains('eat') ||
+        lowerPrompt.contains('food') || lowerPrompt.contains('nutrition') ||
+        lowerPrompt.contains('meal') || lowerPrompt.contains('غذاء') ||
+        lowerPrompt.contains('سعرات');
+
+    // ── 2. MUSCLE FOCUS query ──────────────────────────────────────────────
+    final isMuscleFocusQuery = lowerPrompt.contains('muscle') || lowerPrompt.contains('focus') ||
+        lowerPrompt.contains('عضلة') || lowerPrompt.contains('أولوية') ||
+        (lowerPrompt.contains('which') && (lowerPrompt.contains('train') || lowerPrompt.contains('work')));
+
+    if (isNutritionQuery) {
+      // ── Mifflin-St Jeor BMR ──────────────────────────────────────────────
+      final bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5; // male formula (conservative)
+      final activityMultiplier = completedSessions == '0' ? 1.375 : 1.55; // lightly/moderately active
+      final tdee = (bmr * activityMultiplier).round();
+
+      // Adjust calories by goal
+      int targetCalories = tdee;
+      String goalContext = '';
+      if (goals.any((g) => g.toLowerCase().contains('loss') || g.toLowerCase().contains('cut'))) {
+        targetCalories = tdee - 400;
+        goalContext = 'In a **calorie deficit** (-400 kcal) for fat loss.';
+      } else if (goals.any((g) => g.toLowerCase().contains('gain') || g.toLowerCase().contains('muscle') || g.toLowerCase().contains('bulk'))) {
+        targetCalories = tdee + 300;
+        goalContext = 'In a **calorie surplus** (+300 kcal) for muscle gain.';
       } else {
-        responseText =
-            'أهلاً بك! أنا مدربك الشخصي الذكي من Core-360. 🏋️‍♂️ لقد قمت بتحليل استفسارك: "$userPrompt".\n\nبناءً على أهدافك ($goals) ووزنك الحركي الحالي ($weight كجم)، أنصحك بالتركيز على جودة الأداء واستقامة المفاصل. لقد أتممت حتى الآن $completedSessions حصة تدريبية ناجحة، استمر في التقدم!';
+        goalContext = 'At **maintenance** calories for body recomposition.';
       }
-    } else {
-      if (lowerPrompt.contains('plan') ||
-          lowerPrompt.contains('routine') ||
-          lowerPrompt.contains('workout') ||
-          lowerPrompt.contains('schedule') ||
-          lowerPrompt.contains('generate')) {
-        responseText =
-            'Welcome to Core-360 Neural Coaching! 🌌 Based on your weight of $weight kg and goals ($goals), here is a custom biomechanically-safe routine designed for you:\n\n'
-            '[PLAN_PROPOSAL]\n'
-            '{\n'
-            '  "name": "AI Personal Conditioning",\n'
-            '  "exercises": [\n'
-            '    {\n'
-            '      "workoutId": "squats_003",\n'
-            '      "title": "Bodyweight Squat",\n'
-            '      "sets": [\n'
-            '        {"reps": 12, "kg": 0.0},\n'
-            '        {"reps": 12, "kg": 0.0},\n'
-            '        {"reps": 12, "kg": 0.0}\n'
-            '      ],\n'
-            '      "order": 0\n'
-            '    },\n'
-            '    {\n'
-            '      "workoutId": "push_ups_002",\n'
-            '      "title": "Push-Up",\n'
-            '      "sets": [\n'
-            '        {"reps": 12, "kg": 0.0},\n'
-            '        {"reps": 12, "kg": 0.0}\n'
-            '      ],\n'
-            '      "order": 1\n'
-            '    },\n'
-            '    {\n'
-            '      "workoutId": "plank_005",\n'
-            '      "title": "Forearm Plank",\n'
-            '      "sets": [\n'
-            '        {"reps": 1, "kg": 0.0}\n'
-            '      ],\n'
-            '      "order": 2\n'
-            '    }\n'
-            '  ]\n'
-            '}\n'
-            '[/PLAN_PROPOSAL]\n\n'
-            'You can tap the card above to immediately import this routine into your personal library and launch it with live computer vision joint flexion warnings!';
-      } else {
-        responseText = 'Welcome to Core-360 Neural Coaching! 🌌 I am your dedicated AI fitness companion.\n\nAsk me anything about proper joint alignment, squat depth calculations, or request a custom workout split tailored to bypass physical limits!';
+
+      // Macro split
+      final proteinG  = (weight * 2.0).round();           // 2g per kg bodyweight
+      final proteinKcal = proteinG * 4;
+      final fatKcal   = (targetCalories * 0.25).round();
+      final fatG      = (fatKcal / 9).round();
+      final carbKcal  = targetCalories - proteinKcal - fatKcal;
+      final carbG     = (carbKcal / 4).round();
+
+      // Muscle priority based on goals
+      String primaryMuscle = 'Compound movements (full body)';
+      if (goals.any((g) => g.toLowerCase().contains('loss'))) {
+        primaryMuscle = 'Large muscle groups (legs & back) — burns the most calories';
+      } else if (goals.any((g) => g.toLowerCase().contains('posture'))) {
+        primaryMuscle = 'Posterior chain: rear delts, rhomboids, glutes';
+      } else if (goals.any((g) => g.toLowerCase().contains('endurance'))) {
+        primaryMuscle = 'Cardiovascular base + lower body endurance (legs, core)';
+      } else if (goals.any((g) => g.toLowerCase().contains('gain') || g.toLowerCase().contains('muscle'))) {
+        primaryMuscle = 'Chest + back (largest muscle groups → fastest visible gains)';
       }
+
+      responseText = hasProfile
+          ? '📊 **Personalized Calorie & Macro Breakdown**\n\n'
+              '**Your Stats:** ${weight.round()} kg • ${height.round()} cm • $age yrs\n'
+              '**Goal:** ${goals.join(', ')}\n\n'
+              '─────────────────────────\n'
+              '🔥 **Estimated TDEE:** $tdee kcal/day\n'
+              '🎯 **Target Calories:** $targetCalories kcal/day\n'
+              '$goalContext\n\n'
+              '**Macro Breakdown:**\n'
+              '• 🥩 Protein: **${proteinG}g** ($proteinKcal kcal) — muscle preservation & recovery\n'
+              '• 🍚 Carbs:   **${carbG}g** ($carbKcal kcal) — primary training fuel\n'
+              '• 🥑 Fat:     **${fatG}g** ($fatKcal kcal) — hormones & joint health\n\n'
+              '💡 **Muscle Priority for Weeks 1–2:**\n'
+              '$primaryMuscle — train these 2–3× per week first.\n\n'
+              '**Why?** Starting with large muscle groups maximises hormonal response (testosterone + GH) '
+              'and establishes neural efficiency early in your program.${signOff[random.nextInt(signOff.length)]}'
+          : 'To give you a precise calorie and macro breakdown, I need your profile data (weight, height, age, goals). '
+              'Please complete your onboarding profile first, then I can calculate your exact TDEE and macros!';
     }
 
-    final words = responseText.split(' ');
-    for (int i = 0; i < words.length; i++) {
-      yield '${words[i]} ';
-      await Future.delayed(const Duration(milliseconds: 30));
+    // ── 3. MUSCLE FOCUS (standalone) ──────────────────────────────────────
+    else if (isMuscleFocusQuery && !isNutritionQuery) {
+      String muscleAdvice;
+      if (goals.any((g) => g.toLowerCase().contains('loss'))) {
+        muscleAdvice = '**Legs & Glutes** — they are your largest muscle groups and burn the most calories per session. '
+            'Pair with back training to maintain posture under a calorie deficit.';
+      } else if (goals.any((g) => g.toLowerCase().contains('posture'))) {
+        muscleAdvice = '**Posterior chain** (rear delts, rhomboids, lower traps) — most people sit hunched forward, '
+            'so pulling the shoulders back is the fastest posture fix. Add face pulls and rows every session.';
+      } else if (goals.any((g) => g.toLowerCase().contains('gain') || g.toLowerCase().contains('muscle'))) {
+        muscleAdvice = '**Chest + Back** simultaneously. These are the largest upper-body muscle groups. '
+            'A push-pull pairing in weeks 1–2 builds the widest visible foundation and maximises hypertrophy signals.';
+      } else {
+        muscleAdvice = '**Core + Legs** — for general fitness, a strong core stabilises every other movement '
+            'and strong legs drive your metabolism. Start here for the first two weeks.';
+      }
+      responseText = '🎯 **Muscle Focus — Weeks 1–2**\n\n'
+          'Based on your goals (${goals.join(', ')}), prioritise:\n\n'
+          '$muscleAdvice\n\n'
+          'After 2 weeks your nervous system will be primed and you can expand to accessory work.${signOff[random.nextInt(signOff.length)]}';
     }
+
+    // ── 4. WORKOUT PLAN ────────────────────────────────────────────────────
+    else if (lowerPrompt.contains('plan') || lowerPrompt.contains('routine') ||
+        lowerPrompt.contains('workout') || lowerPrompt.contains('schedule') ||
+        lowerPrompt.contains('generate') || lowerPrompt.contains('create') ||
+        lowerPrompt.contains('خطة') || lowerPrompt.contains('برنامج')) {
+      final focus = _detectFocus(lowerPrompt);
+      final planName = 'AI Custom ${_capitalize(focus)} Workout';
+      final exercises = _generateExercisesForFocus(focus, injuries, random);
+      responseText = 'Based on your profile (weight: ${weight.round()} kg, goals: ${goals.join(', ')}), '
+          "I've created a personalized ${_capitalize(focus)} routine for you.\n\n"
+          '[PLAN_PROPOSAL]\n'
+          '{\n'
+          '  "name": "$planName",\n'
+          '  "exercises": ${jsonEncode(exercises)}\n'
+          '}\n'
+          '[/PLAN_PROPOSAL]\n\n'
+          'Tap the card above to save this routine.${signOff[random.nextInt(signOff.length)]}';
+    }
+
+    // ── 5. FORM / TECHNIQUE ────────────────────────────────────────────────
+    else if (lowerPrompt.contains('form') || lowerPrompt.contains('technique') || lowerPrompt.contains('how to')) {
+      final exercise = _extractExerciseName(lowerPrompt);
+      responseText = exercise.isNotEmpty
+          ? 'For proper **$exercise** form:\n'
+              '• Controlled eccentric phase (2–3 sec down)\n'
+              '• Full range of motion without locking joints\n'
+              '• Brace your core throughout\n'
+              '• Exhale during the exertion phase\n\n'
+              'Would you like a video tutorial?${signOff[random.nextInt(signOff.length)]}'
+          : 'Proper form prevents injury. Keep your spine neutral, engage your core, '
+              'and move through a full but pain-free range of motion. Which exercise are you working on?';
+    }
+
+    // ── 6. INJURY / PAIN ──────────────────────────────────────────────────
+    else if (lowerPrompt.contains('injury') || lowerPrompt.contains('pain') || lowerPrompt.contains('hurt')) {
+      responseText = "I'm sorry to hear you're experiencing discomfort. "
+          'Based on your profile, you have: **$injuries**. '
+          'Please consult a medical professional before continuing. '
+          'In the meantime, consider low-impact alternatives like swimming or stationary cycling. '
+          'Would you like modified exercises for your condition?';
+    }
+
+    // ── 7. PROGRESS ───────────────────────────────────────────────────────
+    else if (lowerPrompt.contains('progress') || lowerPrompt.contains('improve') || lowerPrompt.contains('result')) {
+      responseText = "Great job! You've completed **$completedSessions** sessions "
+          'with a total volume of **$totalVolume kg**. '
+          'To accelerate progress, increase weights by 5% weekly or add one extra set. '
+          'Consistency is key!${signOff[random.nextInt(signOff.length)]}';
+    }
+
+    // ── 8. MOTIVATION ─────────────────────────────────────────────────────
+    else if (lowerPrompt.contains('motivation') || lowerPrompt.contains('tired') || lowerPrompt.contains('give up')) {
+      final quotes = [
+        "The only bad workout is the one that didn't happen.",
+        "Your body can stand almost anything. It's your mind you have to convince.",
+        "Don't limit your challenges. Challenge your limits.",
+        'The pain you feel today will be the strength you feel tomorrow.',
+      ];
+      responseText = '${quotes[random.nextInt(quotes.length)]} '
+          "You've already shown dedication by completing **$completedSessions sessions**. "
+          "Take a rest day if needed — but don't quit!${signOff[random.nextInt(signOff.length)]}";
+    }
+
+    // ── 9. SLEEP / RECOVERY ───────────────────────────────────────────────
+    else if (lowerPrompt.contains('sleep') || lowerPrompt.contains('recovery') || lowerPrompt.contains('rest')) {
+      responseText = '😴 **Recovery is where gains happen.**\n\n'
+          '• Aim for **7–9 hours** of quality sleep per night\n'
+          '• Take at least **1 full rest day** per 3 training days\n'
+          '• Post-workout: consume **${(weight * 0.4).round()}g protein** within 45 minutes\n'
+          '• Stay hydrated: **${(weight * 35 / 1000).toStringAsFixed(1)}L water** daily\n\n'
+          'Poor recovery is the #1 reason people plateau.${signOff[random.nextInt(signOff.length)]}';
+    }
+
+    // ── 10. GREETING ──────────────────────────────────────────────────────
+    else if (RegExp(r'\b(hello|hi|hey|hiya|howdy|مرحبا|السلام)\b').hasMatch(lowerPrompt)) {
+      final hour = DateTime.now().hour;
+      final timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+      responseText = "$timeGreeting${hasProfile ? ', ${goals.isNotEmpty ? goals.first : 'athlete'} in training' : ''}! "
+          "I'm your AI fitness coach. I have access to your full profile — ask me about:\n"
+          '• 📊 Calorie & macro breakdown\n'
+          '• 💪 Which muscles to prioritise\n'
+          '• 🏋️ Custom workout routines\n'
+          '• 🥗 Nutrition advice\n'
+          '• 📈 Progress analysis\n\n'
+          'What would you like to focus on today?';
+    }
+
+    // ── 11. DEFAULT: use profile data in response ──────────────────────────
+    else {
+      responseText = hasProfile
+          ? 'I understand you\'re asking about: "${userPrompt.length > 60 ? '${userPrompt.substring(0, 60)}...' : userPrompt}"\n\n'
+              'Based on your profile (**${weight.round()} kg, ${height.round()} cm**, goals: ${goals.join(', ')}), '
+              'here\'s what I can help you with:\n'
+              '• 📊 Type "calorie breakdown" → get your exact TDEE and macros\n'
+              '• 💪 Type "which muscle to focus on" → get a priority plan for your goals\n'
+              '• 🏋️ Type "create a plan" → generate a full workout routine\n'
+              '• 📈 Type "my progress" → review your training stats\n\n'
+              'What would you like to dive into?${signOff[random.nextInt(signOff.length)]}'
+          : "I'm your AI fitness coach. Complete your profile first so I can give you personalized advice. "
+              "You can ask me to generate a workout plan, check your form, track progress, or provide calorie & macro breakdowns.";
+    }
+
+    // ── Stream word-by-word (plan block atomically) ────────────────────────
+    final planStart = responseText.indexOf('[PLAN_PROPOSAL]');
+    final textPart = planStart != -1 ? responseText.substring(0, planStart).trimRight() : responseText;
+    final planPart = planStart != -1 ? responseText.substring(planStart) : '';
+
+    final words = textPart.split(' ');
+    for (final word in words) {
+      yield '$word ';
+      await Future.delayed(Duration(milliseconds: 25 + random.nextInt(20)));
+    }
+    if (planPart.isNotEmpty) yield planPart;
+  }
+  
+  // Helper methods for chat simulation
+  String _detectFocus(String lowerPrompt) {
+    if (lowerPrompt.contains('chest') || lowerPrompt.contains('push')) return 'push';
+    if (lowerPrompt.contains('back') || lowerPrompt.contains('pull')) return 'pull';
+    if (lowerPrompt.contains('leg') || lowerPrompt.contains('squat')) return 'legs';
+    if (lowerPrompt.contains('core') || lowerPrompt.contains('ab')) return 'core';
+    return 'full_body';
+  }
+  
+  String _extractExerciseName(String lowerPrompt) {
+    final known = ['squat', 'bench press', 'push-up', 'pull-up', 'deadlift', 'plank', 'lunge'];
+    for (var ex in known) {
+      if (lowerPrompt.contains(ex)) return ex;
+    }
+    return '';
+  }
+  
+  String _capitalize(String s) => s.isEmpty ? '' : s[0].toUpperCase() + s.substring(1);
+  
+  List<Map<String, dynamic>> _generateExercisesForFocus(String focus, String injuries, Random random) {
+    // Simplified exercise generation for chat proposals
+    final List<Map<String, dynamic>> exercises = [];
+    if (focus == 'push') {
+      exercises.add({'workoutId': 'push_ups_002', 'title': 'Push-Up', 'sets': [{'reps': 12, 'kg': 0}], 'order': 0});
+      exercises.add({'workoutId': 'bench_press_001', 'title': 'Barbell Bench Press', 'sets': [{'reps': 10, 'kg': 30}], 'order': 1});
+    } else if (focus == 'pull') {
+      exercises.add({'workoutId': 'pull_ups_004', 'title': 'Pull-Up', 'sets': [{'reps': 8, 'kg': 0}], 'order': 0});
+      exercises.add({'workoutId': 'rows_006', 'title': 'Seated Row', 'sets': [{'reps': 12, 'kg': 25}], 'order': 1});
+    } else if (focus == 'legs') {
+      exercises.add({'workoutId': 'squats_003', 'title': 'Bodyweight Squat', 'sets': [{'reps': 15, 'kg': 0}], 'order': 0});
+      exercises.add({'workoutId': 'lunges_008', 'title': 'Walking Lunge', 'sets': [{'reps': 12, 'kg': 0}], 'order': 1});
+    } else {
+      exercises.add({'workoutId': 'squats_003', 'title': 'Bodyweight Squat', 'sets': [{'reps': 12, 'kg': 0}], 'order': 0});
+      exercises.add({'workoutId': 'push_ups_002', 'title': 'Push-Up', 'sets': [{'reps': 12, 'kg': 0}], 'order': 1});
+      exercises.add({'workoutId': 'plank_005', 'title': 'Plank', 'sets': [{'reps': 1, 'kg': 0}], 'order': 2});
+    }
+    return exercises;
   }
 
   /// Fetch Chat History (GET /api/chat)

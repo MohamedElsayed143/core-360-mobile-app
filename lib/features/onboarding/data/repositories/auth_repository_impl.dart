@@ -111,8 +111,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> updateEmail(String newEmail) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('No authenticated user.');
-    await user.updateEmail(newEmail.trim());
-    await user.sendEmailVerification();
+    await user.verifyBeforeUpdateEmail(newEmail.trim());
     await _client.usersCollection.doc(user.uid).update({
       'email': newEmail.trim(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -154,31 +153,31 @@ class AuthRepositoryImpl implements AuthRepository {
     batch.delete(userDoc);
 
     final sessions = await _client.sessionsCollection.where('userId', isEqualTo: userId).get();
-    for (final doc in sessions.docs) batch.delete(doc.reference);
+    for (final doc in sessions.docs) { batch.delete(doc.reference); }
 
     final routines = await _client.routinesCollection.where('userId', isEqualTo: userId).get();
-    for (final doc in routines.docs) batch.delete(doc.reference);
+    for (final doc in routines.docs) { batch.delete(doc.reference); }
 
     final chats = await _client.chatsCollection.where('userId', isEqualTo: userId).get();
-    for (final doc in chats.docs) batch.delete(doc.reference);
+    for (final doc in chats.docs) { batch.delete(doc.reference); }
 
     final aiPlans = await _client.aiPlansCollection.where('userId', isEqualTo: userId).get();
-    for (final doc in aiPlans.docs) batch.delete(doc.reference);
+    for (final doc in aiPlans.docs) { batch.delete(doc.reference); }
 
     final analysisResults = await _client.analysisResultsCollection.where('userId', isEqualTo: userId).get();
-    for (final doc in analysisResults.docs) batch.delete(doc.reference);
+    for (final doc in analysisResults.docs) { batch.delete(doc.reference); }
 
     final alerts = await _client.alertsCollection.where('userId', isEqualTo: userId).get();
-    for (final doc in alerts.docs) batch.delete(doc.reference);
+    for (final doc in alerts.docs) { batch.delete(doc.reference); }
 
     final progress = await _client.progressCollection.where('userId', isEqualTo: userId).get();
-    for (final doc in progress.docs) batch.delete(doc.reference);
+    for (final doc in progress.docs) { batch.delete(doc.reference); }
 
     final shared = await _client.sharedRoutinesCollection.where('userId', isEqualTo: userId).get();
-    for (final doc in shared.docs) batch.delete(doc.reference);
+    for (final doc in shared.docs) { batch.delete(doc.reference); }
 
     final aiAnalysis = await _client.aiAnalysisSessionsCollection.where('userId', isEqualTo: userId).get();
-    for (final doc in aiAnalysis.docs) batch.delete(doc.reference);
+    for (final doc in aiAnalysis.docs) { batch.delete(doc.reference); }
 
     await batch.commit();
   }

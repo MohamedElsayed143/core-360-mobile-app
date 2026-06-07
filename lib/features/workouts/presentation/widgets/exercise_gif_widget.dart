@@ -89,9 +89,9 @@ class _ExerciseGifWidgetState extends State<ExerciseGifWidget> {
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: AppTheme.darkBackground.withOpacity(0.75),
+                          color: AppTheme.darkBackground.withValues(alpha: 0.75),
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppTheme.cyberCyan.withOpacity(0.4), width: 1),
+                          border: Border.all(color: AppTheme.cyberCyan.withValues(alpha: 0.4), width: 1),
                         ),
                         child: const Icon(
                           Icons.play_arrow_rounded,

@@ -182,9 +182,9 @@ class HomePlaceholderScreen extends ConsumerWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _buildStatItem('Age', '${profile.age}', 'YRS'),
-                            _buildStatItem('Height', '${profile.height.toStringAsFixed(0)}', 'CM'),
-                            _buildStatItem('Weight', '${profile.weight.toStringAsFixed(1)}', 'KG'),
+                            _buildStatItem('Age', profile.age.toString(), 'YRS'),
+                            _buildStatItem('Height', profile.height.toStringAsFixed(0), 'CM'),
+                            _buildStatItem('Weight', profile.weight.toStringAsFixed(1), 'KG'),
                           ],
                         ),
                         if (profile.bodyFat != null || profile.muscleMass != null) ...[
@@ -195,11 +195,11 @@ class HomePlaceholderScreen extends ConsumerWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               if (profile.bodyFat != null)
-                                _buildStatItem('Body Fat', '${profile.bodyFat!.toStringAsFixed(1)}', '%'),
+                                _buildStatItem('Body Fat', profile.bodyFat!.toStringAsFixed(1), '%'),
                               if (profile.muscleMass != null)
-                                _buildStatItem('Muscle Mass', '${profile.muscleMass!.toStringAsFixed(1)}', 'KG'),
+                                _buildStatItem('Muscle Mass', profile.muscleMass!.toStringAsFixed(1), 'KG'),
                               if (profile.waterPercentage != null)
-                                _buildStatItem('Body Water', '${profile.waterPercentage!.toStringAsFixed(1)}', '%'),
+                                _buildStatItem('Body Water', profile.waterPercentage!.toStringAsFixed(1), '%'),
                             ],
                           ),
                         ],

@@ -187,28 +187,28 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
       children: [
         _buildKpiCard(
           'TOTAL VOLUME',
-          '${state.totalVolume.toStringAsFixed(0)}',
+          state.totalVolume.toStringAsFixed(0),
           'KG',
           AppTheme.cyberCyan,
           Icons.fitness_center_outlined,
         ),
         _buildKpiCard(
           'SESSIONS',
-          '${state.completedSessions}',
+          state.completedSessions.toString(),
           'LOGGED',
           AppTheme.electricBlue,
           Icons.emoji_events_outlined,
         ),
         _buildKpiCard(
           'FORM ACCURACY',
-          state.completedSessions == 0 ? 'N/A' : '${state.averageAccuracy.toStringAsFixed(1)}',
+          state.completedSessions == 0 ? 'N/A' : state.averageAccuracy.toStringAsFixed(1),
           '%',
           AppTheme.warningAmber,
           Icons.camera_enhance_outlined,
         ),
         _buildKpiCard(
           'MINUTES TRAINED',
-          '${state.totalMinutes}',
+          state.totalMinutes.toString(),
           'MINS',
           AppTheme.amethystPurple,
           Icons.timer_outlined,

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
@@ -484,7 +484,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ),
                               Switch(
                                 value: _fingerprintEnabled,
-                                activeColor: const Color(0xFF22c55e),
+                                activeThumbColor: const Color(0xFF22c55e),
                                 activeTrackColor: const Color(0xFF22c55e).withValues(alpha: 0.3),
                                 inactiveThumbColor: const Color(0xFF94a3b8),
                                 inactiveTrackColor: const Color(0xFF1e293b),

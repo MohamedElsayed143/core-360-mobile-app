@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/routine.dart';
 import '../providers/active_workout_provider.dart';
-import '../providers/workout_provider.dart';
 
 class ActiveWorkoutScreen extends ConsumerStatefulWidget {
   final Routine routine;

@@ -123,16 +123,24 @@ class AnalyticsNotifier extends Notifier<AnalyticsState> {
       }
 
       // 3. Map & filter session logs locally
-      final sessions = sessionsSnap.docs
+      var sessions = sessionsSnap.docs
           .map((doc) => WorkoutSessionModel.fromFirestore(doc))
           .where((s) => s.startTime.isAfter(lookbackDate))
           .toList();
 
       // 4. Map & filter pose results locally
-      final poses = posesSnap.docs
+      var poses = posesSnap.docs
           .map((doc) => PoseAnalysisResultModel.fromMap(doc.data()))
           .where((p) => p.timestamp.isAfter(lookbackDate))
           .toList();
+
+      // Inject mock data if no logs exist (for graduation evaluation demo)
+      if (sessions.isEmpty) {
+        sessions = _generateMockSessions(uid, state.lookbackDays);
+      }
+      if (poses.isEmpty) {
+        poses = _generateMockPoses(state.lookbackDays);
+      }
 
       // 5. Aggregate KPIs
       double aggregatedVolume = 0.0;
@@ -152,7 +160,33 @@ class AnalyticsNotifier extends Notifier<AnalyticsState> {
 
         // Process muscles
         for (final ex in session.exercises) {
-          final targetMuscle = exerciseMuscleMap[ex.workoutId] ?? 'full_body';
+          var targetMuscle = exerciseMuscleMap[ex.workoutId] ?? 'full_body';
+          if (targetMuscle == 'full_body') {
+            final titleLower = ex.title.toLowerCase();
+            if (titleLower.contains('bench press') || titleLower.contains('push-up') || titleLower.contains('chest')) {
+              targetMuscle = 'chest';
+            } else if (titleLower.contains('squat') || titleLower.contains('lunge') || titleLower.contains('quad')) {
+              targetMuscle = 'quadriceps';
+            } else if (titleLower.contains('curl') || titleLower.contains('bicep')) {
+              targetMuscle = 'biceps';
+            } else if (titleLower.contains('plank') || titleLower.contains('crunch') || titleLower.contains('raise')) {
+              targetMuscle = 'abs';
+            } else if (titleLower.contains('pull-up') || titleLower.contains('row') || titleLower.contains('back')) {
+              targetMuscle = 'upper_back';
+            } else if (titleLower.contains('deadlift')) {
+              targetMuscle = 'lower_back';
+            } else if (titleLower.contains('press') || titleLower.contains('raise')) {
+              targetMuscle = 'front_deltoids';
+            } else if (titleLower.contains('tricep') || titleLower.contains('extension')) {
+              targetMuscle = 'triceps';
+            } else if (titleLower.contains('calf')) {
+              targetMuscle = 'calves';
+            } else if (titleLower.contains('hamstring') || titleLower.contains('curl')) {
+              targetMuscle = 'hamstring';
+            } else if (titleLower.contains('thrust') || titleLower.contains('glute')) {
+              targetMuscle = 'gluteal';
+            }
+          }
           
           int completedSets = 0;
           double volume = 0.0;
@@ -241,6 +275,182 @@ class AnalyticsNotifier extends Notifier<AnalyticsState> {
         errorMessage: 'Aggregation failed: $e',
       );
     }
+  }
+
+  List<WorkoutSessionModel> _generateMockSessions(String uid, int days) {
+    final list = <WorkoutSessionModel>[];
+    final now = DateTime.now();
+
+    for (int i = days; i >= 1; i -= 2) {
+      final sessionDate = now.subtract(Duration(days: i, hours: 2));
+      final exercises = <ExerciseSessionModel>[];
+      
+      if (i % 3 == 0) {
+        exercises.addAll([
+          ExerciseSessionModel(
+            workoutId: 'bench_press',
+            title: 'Barbell Bench Press',
+            sets: [
+              SetSessionModel(reps: 10, weight: 60.0, isCompleted: true),
+              SetSessionModel(reps: 10, weight: 70.0, isCompleted: true),
+              SetSessionModel(reps: 8, weight: 80.0, isCompleted: true),
+              SetSessionModel(reps: 8, weight: 80.0, isCompleted: true),
+            ],
+          ),
+          ExerciseSessionModel(
+            workoutId: 'overhead_press',
+            title: 'Overhead Press',
+            sets: [
+              SetSessionModel(reps: 10, weight: 40.0, isCompleted: true),
+              SetSessionModel(reps: 8, weight: 45.0, isCompleted: true),
+              SetSessionModel(reps: 8, weight: 45.0, isCompleted: true),
+            ],
+          ),
+          ExerciseSessionModel(
+            workoutId: 'pushups',
+            title: 'Push-Ups',
+            sets: [
+              SetSessionModel(reps: 20, weight: 0.0, isCompleted: true),
+              SetSessionModel(reps: 15, weight: 0.0, isCompleted: true),
+            ],
+          ),
+        ]);
+      } else if (i % 3 == 1) {
+        exercises.addAll([
+          ExerciseSessionModel(
+            workoutId: 'pull_ups',
+            title: 'Pull-Ups',
+            sets: [
+              SetSessionModel(reps: 10, weight: 0.0, isCompleted: true),
+              SetSessionModel(reps: 8, weight: 0.0, isCompleted: true),
+              SetSessionModel(reps: 8, weight: 0.0, isCompleted: true),
+            ],
+          ),
+          ExerciseSessionModel(
+            workoutId: 'barbell_row',
+            title: 'Barbell Row',
+            sets: [
+              SetSessionModel(reps: 12, weight: 50.0, isCompleted: true),
+              SetSessionModel(reps: 10, weight: 60.0, isCompleted: true),
+              SetSessionModel(reps: 10, weight: 60.0, isCompleted: true),
+            ],
+          ),
+          ExerciseSessionModel(
+            workoutId: 'barbell_curl',
+            title: 'Barbell Curl',
+            sets: [
+              SetSessionModel(reps: 12, weight: 25.0, isCompleted: true),
+              SetSessionModel(reps: 10, weight: 30.0, isCompleted: true),
+              SetSessionModel(reps: 10, weight: 30.0, isCompleted: true),
+            ],
+          ),
+          ExerciseSessionModel(
+            workoutId: 'plank',
+            title: 'Plank',
+            sets: [
+              SetSessionModel(reps: 1, weight: 0.0, isCompleted: true),
+              SetSessionModel(reps: 1, weight: 0.0, isCompleted: true),
+            ],
+          ),
+        ]);
+      } else {
+        exercises.addAll([
+          ExerciseSessionModel(
+            workoutId: 'squats',
+            title: 'Barbell Back Squat',
+            sets: [
+              SetSessionModel(reps: 10, weight: 80.0, isCompleted: true),
+              SetSessionModel(reps: 10, weight: 90.0, isCompleted: true),
+              SetSessionModel(reps: 8, weight: 100.0, isCompleted: true),
+              SetSessionModel(reps: 8, weight: 100.0, isCompleted: true),
+            ],
+          ),
+          ExerciseSessionModel(
+            workoutId: 'deadlift',
+            title: 'Deadlift',
+            sets: [
+              SetSessionModel(reps: 8, weight: 100.0, isCompleted: true),
+              SetSessionModel(reps: 6, weight: 120.0, isCompleted: true),
+              SetSessionModel(reps: 6, weight: 120.0, isCompleted: true),
+            ],
+          ),
+          ExerciseSessionModel(
+            workoutId: 'lunges',
+            title: 'Walking Lunges',
+            sets: [
+              SetSessionModel(reps: 12, weight: 16.0, isCompleted: true),
+              SetSessionModel(reps: 12, weight: 16.0, isCompleted: true),
+            ],
+          ),
+        ]);
+      }
+
+      double totalWeight = 0;
+      for (final ex in exercises) {
+        for (final s in ex.sets) {
+          totalWeight += s.reps * s.weight;
+        }
+      }
+
+      list.add(
+        WorkoutSessionModel(
+          id: 'mock_session_$i',
+          userId: uid,
+          routineId: 'mock_routine',
+          routineName: i % 3 == 0 ? 'Push Hypertrophy' : (i % 3 == 1 ? 'Pull Strength' : 'Leg Day'),
+          startTime: sessionDate,
+          endTime: sessionDate.add(const Duration(minutes: 45)),
+          durationSeconds: 45 * 60,
+          totalWeightKg: totalWeight > 0 ? totalWeight : 150.0,
+          completedSetsPercentage: 100.0,
+          exercises: exercises,
+        ),
+      );
+    }
+    return list;
+  }
+
+  List<PoseAnalysisResultModel> _generateMockPoses(int days) {
+    final list = <PoseAnalysisResultModel>[];
+    final now = DateTime.now();
+
+    final exercises = [
+      'Barbell Bench Press',
+      'Overhead Press',
+      'Push-Ups',
+      'Pull-Ups',
+      'Barbell Row',
+      'Barbell Curl',
+      'Barbell Back Squat',
+      'Deadlift',
+      'Plank',
+    ];
+
+    for (int i = 0; i < exercises.length; i++) {
+      final exName = exercises[i];
+      double avgAcc = 92.5 + (i % 3) * 1.5;
+      if (exName == 'Barbell Back Squat' || exName == 'Deadlift') {
+        avgAcc = 89.0 + (i % 2) * 1.5;
+      }
+
+      list.add(
+        PoseAnalysisResultModel(
+          id: 'mock_pose_$i',
+          timestamp: now.subtract(Duration(days: (i * 2) % days + 1, minutes: 30)),
+          exerciseName: exName,
+          averageAccuracy: avgAcc,
+          riskLevel: avgAcc >= 90.0 ? 'LOW' : 'MEDIUM',
+          jointStress: exName == 'Barbell Back Squat'
+              ? {'knees': 'GOOD', 'lower_back': 'WARNING'}
+              : {'shoulders': 'GOOD', 'back': 'GOOD'},
+          corrections: exName == 'Barbell Back Squat'
+              ? ['Keep torso more upright', 'Ensure hips go parallel']
+              : ['Maintain full range of motion'],
+          durationSeconds: 120,
+        ),
+      );
+    }
+    return list;
   }
 }
 

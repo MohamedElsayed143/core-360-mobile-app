@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:local_auth/local_auth.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../onboarding/domain/entities/user_profile.dart';
 import '../../../onboarding/presentation/providers/auth_provider.dart';
@@ -37,12 +38,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _twoFactorExpanded = false;
   bool _exportExpanded = false;
 
+  // ─── Biometric Authentication ──────────────────────────────────
+  IconData _biometricIcon = Icons.fingerprint;
+  bool _biometricHardwareAvailable = false;
+
   String? _statusMessage;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _checkBiometricType();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authState = ref.read(authProvider);
       if (authState is AuthenticatedWithProfile) {
@@ -232,6 +238,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 // ─── SECURITY ──────────────────────────────────────────
                 _buildSectionHeader('Security'),
                 const SizedBox(height: 16),
+
+                // Biometric Authentication
+                _buildBiometricTile(),
+                const SizedBox(height: 8),
 
                 // Change Password
                 _buildExpandableTile(
@@ -690,6 +700,261 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           Text(label, style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 12)),
           Text(value, style: GoogleFonts.jetBrainsMono(color: AppTheme.cyberCyan, fontSize: 14, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _checkBiometricType() async {
+    try {
+      final localAuth = LocalAuthentication();
+      final canCheck = await localAuth.canCheckBiometrics;
+      final isSupported = await localAuth.isDeviceSupported();
+      if (canCheck && isSupported) {
+        final available = await localAuth.getAvailableBiometrics();
+        if (available.contains(BiometricType.face)) {
+          _biometricIcon = Icons.face;
+        } else {
+          _biometricIcon = Icons.fingerprint;
+        }
+        _biometricHardwareAvailable = true;
+      } else {
+        _biometricHardwareAvailable = false;
+      }
+    } catch (_) {
+      _biometricHardwareAvailable = false;
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _handleBiometricToggle(bool enable) async {
+    if (!enable) {
+      await _revokeBiometrics();
+      return;
+    }
+
+    if (!_biometricHardwareAvailable) {
+      _setStatus('Biometric authentication is not supported or set up on this device.');
+      return;
+    }
+
+    final password = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        bool obscure = true;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.darkSurface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: AppTheme.cardBorderColor),
+              ),
+              title: Text(
+                'Confirm Password',
+                style: GoogleFonts.outfit(
+                  color: AppTheme.textWhite,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Enter your password to encrypt and save your credentials securely.',
+                    style: GoogleFonts.outfit(
+                      color: AppTheme.textSub,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkBackground,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.cardBorderColor),
+                    ),
+                    child: TextField(
+                      controller: controller,
+                      obscureText: obscure,
+                      style: GoogleFonts.outfit(color: AppTheme.textWhite, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Your password',
+                        hintStyle: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 13),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                            color: AppTheme.textMuted,
+                          ),
+                          onPressed: () => setDialogState(() => obscure = !obscure),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Cancel', style: GoogleFonts.outfit(color: AppTheme.textSub)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final pw = controller.text;
+                    if (pw.isNotEmpty) {
+                      Navigator.pop(ctx, pw);
+                    }
+                  },
+                  child: Text('Enable', style: GoogleFonts.outfit(color: AppTheme.cyberCyan, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (password == null || password.isEmpty) {
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    final err = await ref.read(authProvider.notifier).enableBiometrics(password);
+    setState(() => _isLoading = false);
+
+    if (err != null) {
+      _setStatus(err);
+    } else {
+      _setStatus('Biometric authentication enabled.');
+    }
+  }
+
+  Future<void> _revokeBiometrics() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.darkSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppTheme.cardBorderColor),
+        ),
+        title: Text(
+          'Disable Biometrics?',
+          style: GoogleFonts.outfit(
+            color: AppTheme.crimsonRed,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'This will clear saved login credentials from secure storage. You will need to type your password next time.',
+          style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: AppTheme.textSub)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Disable', style: GoogleFonts.outfit(color: AppTheme.crimsonRed, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isLoading = true);
+    final err = await ref.read(authProvider.notifier).disableBiometrics();
+    setState(() => _isLoading = false);
+
+    if (err != null) {
+      _setStatus(err);
+    } else {
+      _setStatus('Biometric authentication disabled.');
+    }
+  }
+
+  Widget _buildBiometricTile() {
+    final isBiometricEnabled = ref.watch(biometricEnabledProvider);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppTheme.darkSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.cardBorderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(_biometricIcon, color: AppTheme.cyberCyan, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Biometric Authentication',
+                      style: GoogleFonts.outfit(
+                        color: AppTheme.textWhite,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Secure your biometric data for instant access',
+                      style: GoogleFonts.outfit(
+                        color: AppTheme.textSub,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: isBiometricEnabled,
+                activeThumbColor: AppTheme.cyberCyan,
+                activeTrackColor: AppTheme.cyberCyan.withValues(alpha: 0.3),
+                inactiveThumbColor: AppTheme.textMuted,
+                inactiveTrackColor: AppTheme.darkBackground,
+                onChanged: _handleBiometricToggle,
+              ),
+            ],
+          ),
+          if (isBiometricEnabled) ...[
+            const SizedBox(height: 12),
+            const Divider(color: AppTheme.cardBorderColor, height: 1),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: _revokeBiometrics,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.delete_forever_outlined, color: AppTheme.crimsonRed, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'REVOKE & CLEAR SECURE CREDENTIALS',
+                    style: GoogleFonts.outfit(
+                      color: AppTheme.crimsonRed,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

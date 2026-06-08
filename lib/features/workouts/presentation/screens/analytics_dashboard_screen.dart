@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -15,6 +16,7 @@ class AnalyticsDashboardScreen extends ConsumerStatefulWidget {
 
 class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScreen> {
   bool _isAnteriorView = true;
+  String? _selectedMuscleKey;
 
   @override
   Widget build(BuildContext context) {
@@ -586,6 +588,23 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
   }
 
   Widget _buildMuscleMatrixCard(AnalyticsState state) {
+    final anteriorMuscles = [
+      ('chest', 'Pecs / Chest'),
+      ('abs', 'Abdominals'),
+      ('biceps', 'Biceps'),
+      ('front_deltoids', 'Front Delts'),
+      ('quadriceps', 'Quads / Thighs'),
+    ];
+    final posteriorMuscles = [
+      ('upper_back', 'Traps / Upper Back'),
+      ('lower_back', 'Lats / Lower Back'),
+      ('triceps', 'Triceps'),
+      ('gluteal', 'Glutes / Hip'),
+      ('hamstring', 'Hamstrings'),
+      ('calves', 'Calves'),
+    ];
+    final muscles = _isAnteriorView ? anteriorMuscles : posteriorMuscles;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -596,7 +615,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Matrix Header & anterior/posterior toggle
+          // ── Header ────────────────────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -626,72 +645,258 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
               _buildAnatomicalToggle(),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          // Side-by-side or Toggled view layout
+          // ── Body model + list (side-by-side) ──────────────────────
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Visual Body outline illustration representing matrix zones
+              // ── Left: Interactive vector body ──────────────────────
               Expanded(
-                flex: 1,
-                child: SizedBox(
-                  height: 240,
-                  child: Center(
-                    child: Image.asset(
-                      _isAnteriorView
-                          ? 'assets/images/body_front_blueprint.png'
-                          : 'assets/images/body_back_blueprint.png',
-                      color: AppTheme.cyberCyan.withValues(alpha: 0.12),
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        // Fallback vector-like mockup in case image is missing
-                        return Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppTheme.textMuted),
-                            borderRadius: BorderRadius.circular(16),
-                            color: Colors.black.withValues(alpha: 0.2),
+                flex: 5,
+                child: Column(
+                  children: [
+                    // Model viewport
+                    GestureDetector(
+                      onTapUp: (details) => _onBodyTap(details.localPosition, state),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 350),
+                        curve: Curves.easeInOut,
+                        height: _selectedMuscleKey != null ? 280 : 240,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: CustomPaint(
+                            painter: _BodyModelPainter(
+                              isAnterior: _isAnteriorView,
+                              muscleStats: state.muscleStats,
+                              selectedKey: _selectedMuscleKey,
+                            ),
+                            child: const SizedBox.expand(),
                           ),
-                          child: Icon(
-                            Icons.accessibility_new_outlined,
-                            color: AppTheme.cyberCyan.withValues(alpha: 0.35),
-                            size: 64,
-                          ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
-                  ),
+
+                    // ── Zoom-in Stats Overlay Card ─────────────────────
+                    if (_selectedMuscleKey != null) ...[
+                      const SizedBox(height: 12),
+                      _buildMuscleZoomCard(
+                        state,
+                        muscles.firstWhere(
+                          (m) => m.$1 == _selectedMuscleKey,
+                          orElse: () => (_selectedMuscleKey!, _selectedMuscleKey!),
+                        ),
+                      ),
+                    ],
+
+                    // Tap-hint caption
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _selectedMuscleKey != null
+                              ? Icons.touch_app
+                              : Icons.touch_app_outlined,
+                          color: AppTheme.cyberCyan.withValues(alpha: 0.5),
+                          size: 12,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _selectedMuscleKey != null
+                              ? 'Tap empty area to reset'
+                              : 'Tap a muscle to zoom & inspect',
+                          style: GoogleFonts.outfit(
+                            color: AppTheme.textMuted,
+                            fontSize: 9,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
 
-              // Interactive muscle groups grid cards
+              // ── Right: Muscle list ─────────────────────────────────
               Expanded(
-                flex: 1,
+                flex: 4,
                 child: Column(
-                  children: _isAnteriorView
-                      ? [
-                          _buildMuscleRowItem(state, 'chest', 'Pecs / Chest'),
-                          _buildMuscleRowItem(state, 'abs', 'Abdominals'),
-                          _buildMuscleRowItem(state, 'biceps', 'Biceps'),
-                          _buildMuscleRowItem(state, 'front_deltoids', 'Front Delts'),
-                          _buildMuscleRowItem(state, 'quadriceps', 'Quads / Thighs'),
-                        ]
-                      : [
-                          _buildMuscleRowItem(state, 'upper_back', 'Traps / Upper Back'),
-                          _buildMuscleRowItem(state, 'lower_back', 'Lats / Lower Back'),
-                          _buildMuscleRowItem(state, 'triceps', 'Triceps'),
-                          _buildMuscleRowItem(state, 'gluteal', 'Glutes / Hip'),
-                          _buildMuscleRowItem(state, 'hamstring', 'Hamstrings'),
-                          _buildMuscleRowItem(state, 'calves', 'Calves'),
-                        ],
+                  children: muscles
+                      .map((m) => _buildMuscleRowItem(state, m.$1, m.$2))
+                      .toList(),
                 ),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  // ── Tap handler for body model ────────────────────────────────────
+  void _onBodyTap(Offset localPos, AnalyticsState state) {
+    // Map relative position (0..1) in the 240/280-height container
+    final containerH = _selectedMuscleKey != null ? 280.0 : 240.0;
+    final relY = localPos.dy / containerH;
+    final relX = localPos.dx; // absolute x in px (container is full width)
+
+    String? hit;
+    if (_isAnteriorView) {
+      if (relY < 0.20) {
+        hit = 'front_deltoids';
+      } else if (relY < 0.38) {
+        hit = 'chest';
+      } else if (relY < 0.56) {
+        hit = 'abs';
+      } else if (relY < 0.72) {
+        hit = 'quadriceps';
+      } else if (relX < 80 || relX > 160) {
+        hit = 'biceps';
+      }
+    } else {
+      if (relY < 0.22) {
+        hit = 'upper_back';
+      } else if (relY < 0.45) {
+        hit = 'lower_back';
+      } else if (relY < 0.60) {
+        hit = 'gluteal';
+      } else if (relY < 0.78) {
+        hit = 'hamstring';
+      } else if (relY < 0.92) {
+        hit = 'calves';
+      } else {
+        hit = 'triceps';
+      }
+    }
+
+    setState(() {
+      _selectedMuscleKey = (_selectedMuscleKey == hit) ? null : hit;
+    });
+  }
+
+  Widget _buildMuscleZoomCard(AnalyticsState state, (String, String) muscle) {
+    final key = muscle.$1;
+    final name = muscle.$2;
+    final stat = state.muscleStats[key];
+    final sets = stat?.totalSets ?? 0;
+    final vol = stat?.totalVolume ?? 0.0;
+    final exercises = stat?.topExercises ?? [];
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 300),
+      opacity: 1.0,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.cyberCyan.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppTheme.cyberCyan.withValues(alpha: 0.35),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.cyberCyan.withValues(alpha: 0.08),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.analytics_outlined,
+                    color: AppTheme.cyberCyan, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    name.toUpperCase(),
+                    style: GoogleFonts.outfit(
+                      color: AppTheme.cyberCyan,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _selectedMuscleKey = null),
+                  child: const Icon(Icons.close,
+                      color: AppTheme.textMuted, size: 16),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _buildZoomStat('SETS', '$sets'),
+                const SizedBox(width: 16),
+                _buildZoomStat('VOLUME', '${vol.toStringAsFixed(0)} kg'),
+              ],
+            ),
+            if (exercises.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                'TOP EXERCISES',
+                style: GoogleFonts.outfit(
+                  color: AppTheme.textMuted,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(height: 6),
+              ...exercises.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('›  ',
+                          style: TextStyle(
+                              color: AppTheme.cyberCyan, fontSize: 11)),
+                      Expanded(
+                        child: Text(
+                          e,
+                          style: GoogleFonts.outfit(
+                              color: AppTheme.textSub, fontSize: 10),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else
+              Text(
+                'No exercises logged yet.',
+                style: GoogleFonts.outfit(
+                    color: AppTheme.textMuted, fontSize: 10),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildZoomStat(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: GoogleFonts.outfit(
+                color: AppTheme.textMuted,
+                fontSize: 9,
+                fontWeight: FontWeight.bold)),
+        const SizedBox(height: 2),
+        Text(value,
+            style: GoogleFonts.outfit(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold)),
+      ],
     );
   }
 
@@ -706,39 +911,53 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => setState(() => _isAnteriorView = true),
+            onTap: () => setState(() {
+              _isAnteriorView = true;
+              _selectedMuscleKey = null;
+            }),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                color: _isAnteriorView ? AppTheme.cyberCyan.withValues(alpha: 0.08) : Colors.transparent,
+                color: _isAnteriorView
+                    ? AppTheme.cyberCyan.withValues(alpha: 0.08)
+                    : Colors.transparent,
               ),
               child: Text(
                 'FRONT',
                 style: GoogleFonts.outfit(
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
-                  color: _isAnteriorView ? AppTheme.cyberCyan : AppTheme.textMuted,
+                  color: _isAnteriorView
+                      ? AppTheme.cyberCyan
+                      : AppTheme.textMuted,
                 ),
               ),
             ),
           ),
           GestureDetector(
-            onTap: () => setState(() => _isAnteriorView = false),
+            onTap: () => setState(() {
+              _isAnteriorView = false;
+              _selectedMuscleKey = null;
+            }),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                color: !_isAnteriorView ? AppTheme.cyberCyan.withValues(alpha: 0.08) : Colors.transparent,
+                color: !_isAnteriorView
+                    ? AppTheme.cyberCyan.withValues(alpha: 0.08)
+                    : Colors.transparent,
               ),
               child: Text(
                 'BACK',
                 style: GoogleFonts.outfit(
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
-                  color: !_isAnteriorView ? AppTheme.cyberCyan : AppTheme.textMuted,
+                  color: !_isAnteriorView
+                      ? AppTheme.cyberCyan
+                      : AppTheme.textMuted,
                 ),
               ),
             ),
@@ -751,8 +970,8 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
   Widget _buildMuscleRowItem(AnalyticsState state, String key, String name) {
     final stat = state.muscleStats[key];
     final sets = stat?.totalSets ?? 0;
+    final isSelected = _selectedMuscleKey == key;
 
-    // Shade configuration proportional to sets intensity
     Color neonColor = AppTheme.cyberCyan;
     double opacity = 0.03;
     if (sets >= 9) {
@@ -764,28 +983,52 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
     }
 
     return GestureDetector(
-      onTap: () => _showMuscleTooltip(name, stat),
+      onTap: () => setState(() {
+        _selectedMuscleKey = isSelected ? null : key;
+      }),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: EdgeInsets.symmetric(
+            horizontal: 12, vertical: isSelected ? 12 : 9),
         decoration: BoxDecoration(
-          color: neonColor.withValues(alpha: opacity),
+          color: isSelected
+              ? neonColor.withValues(alpha: 0.12)
+              : neonColor.withValues(alpha: opacity),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: sets > 0 ? neonColor.withValues(alpha: opacity + 0.1) : AppTheme.cardBorderColor,
-            width: 1.0,
+            color: isSelected
+                ? neonColor.withValues(alpha: 0.6)
+                : sets > 0
+                    ? neonColor.withValues(alpha: opacity + 0.1)
+                    : AppTheme.cardBorderColor,
+            width: isSelected ? 1.5 : 1.0,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: neonColor.withValues(alpha: 0.15),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  )
+                ]
+              : [],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              name,
-              style: GoogleFonts.outfit(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: sets > 0 ? Colors.white : AppTheme.textMuted,
+            Flexible(
+              child: Text(
+                name,
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight:
+                      isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: sets > 0 || isSelected
+                      ? Colors.white
+                      : AppTheme.textMuted,
+                ),
               ),
             ),
             Row(
@@ -798,7 +1041,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                     color: sets > 0 ? neonColor : AppTheme.textMuted,
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 3),
                 Text(
                   'SETS',
                   style: GoogleFonts.outfit(
@@ -815,90 +1058,308 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
     );
   }
 
-  void _showMuscleTooltip(String name, MuscleStat? stat) {
-    final sets = stat?.totalSets ?? 0;
-    final vol = stat?.totalVolume ?? 0.0;
-    final exercises = stat?.topExercises ?? [];
+}
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.darkSurface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppTheme.cardBorderColor),
-        ),
-        title: Row(
-          children: [
-            const Icon(Icons.analytics_outlined, color: AppTheme.cyberCyan, size: 20),
-            const SizedBox(width: 10),
-            Text(
-              name.toUpperCase(),
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('TOTAL SETS:', style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 11)),
-                Text('$sets SETS', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('TOTAL VOLUME:', style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 11)),
-                Text('${vol.toStringAsFixed(0)} KG', style: GoogleFonts.outfit(color: AppTheme.cyberCyan, fontWeight: FontWeight.bold, fontSize: 12)),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'TOP EXERCISES LOGGED:',
-              style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-            ),
-            const SizedBox(height: 8),
-            exercises.isEmpty
-                ? Text('No exercises logged yet for this group.', style: GoogleFonts.outfit(color: AppTheme.textMuted, fontSize: 11))
-                : Column(
-                    children: exercises.map((e) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 6.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('• ', style: TextStyle(color: AppTheme.cyberCyan)),
-                            Expanded(
-                              child: Text(
-                                e,
-                                style: GoogleFonts.outfit(color: AppTheme.textSub, fontSize: 11),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'CLOSE',
-              style: GoogleFonts.outfit(
-                color: AppTheme.textMuted,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+// ─── BODY MODEL PAINTER ──────────────────────────────────────────────────────
+// Draws a vector silhouette of the human body (anterior / posterior) and
+// colour-codes each muscle zone with a neon-cyan glow proportional to
+// training volume.  The selected zone receives an animated pulse ring.
+
+class _BodyModelPainter extends CustomPainter {
+  final bool isAnterior;
+  final Map<String, MuscleStat> muscleStats;
+  final String? selectedKey;
+
+  _BodyModelPainter({
+    required this.isAnterior,
+    required this.muscleStats,
+    required this.selectedKey,
+  });
+
+  // Returns glow alpha [0..1] for a given muscle key
+  double _alpha(String key) {
+    final s = muscleStats[key]?.totalSets ?? 0;
+    if (s >= 12) return 0.85;
+    if (s >= 8) return 0.65;
+    if (s >= 4) return 0.42;
+    if (s >= 1) return 0.22;
+    return 0.06;
   }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    // ── Background grid ────────────────────────────────────────────
+    final gridPaint = Paint()
+      ..color = const Color(0xFF00F5FF).withValues(alpha: 0.04)
+      ..strokeWidth = 0.5
+      ..style = PaintingStyle.stroke;
+
+    const gridStep = 20.0;
+    for (double x = 0; x < w; x += gridStep) {
+      canvas.drawLine(Offset(x, 0), Offset(x, h), gridPaint);
+    }
+    for (double y = 0; y < h; y += gridStep) {
+      canvas.drawLine(Offset(0, y), Offset(w, y), gridPaint);
+    }
+
+    // ── Silhouette base ────────────────────────────────────────────
+    final silhouettePaint = Paint()
+      ..color = const Color(0xFF00F5FF).withValues(alpha: 0.07)
+      ..style = PaintingStyle.fill;
+
+    final outlinePaint = Paint()
+      ..color = const Color(0xFF00F5FF).withValues(alpha: 0.18)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    // Whole-body silhouette (simplified polygon centred in canvas)
+    final cx = w / 2;
+    final headR = h * 0.065;
+
+    // HEAD
+    canvas.drawCircle(Offset(cx, h * 0.075), headR, silhouettePaint);
+    canvas.drawCircle(Offset(cx, h * 0.075), headR, outlinePaint);
+
+    // NECK
+    _drawRect(canvas, cx - w * 0.055, h * 0.135, w * 0.11, h * 0.045,
+        silhouettePaint, outlinePaint);
+
+    // TORSO
+    _drawRRect(canvas, cx - w * 0.185, h * 0.175, w * 0.37, h * 0.34,
+        8.0, silhouettePaint, outlinePaint);
+
+    // HIPS
+    _drawRRect(canvas, cx - w * 0.175, h * 0.50, w * 0.35, h * 0.10,
+        6.0, silhouettePaint, outlinePaint);
+
+    // LEFT ARM
+    _drawRRect(canvas, cx - w * 0.30, h * 0.175, w * 0.10, h * 0.33,
+        14.0, silhouettePaint, outlinePaint);
+    // RIGHT ARM
+    _drawRRect(canvas, cx + w * 0.20, h * 0.175, w * 0.10, h * 0.33,
+        14.0, silhouettePaint, outlinePaint);
+
+    // LEFT FOREARM
+    _drawRRect(canvas, cx - w * 0.30, h * 0.505, w * 0.085, h * 0.24,
+        12.0, silhouettePaint, outlinePaint);
+    // RIGHT FOREARM
+    _drawRRect(canvas, cx + w * 0.215, h * 0.505, w * 0.085, h * 0.24,
+        12.0, silhouettePaint, outlinePaint);
+
+    // LEFT THIGH
+    _drawRRect(canvas, cx - w * 0.175, h * 0.59, w * 0.155, h * 0.23,
+        12.0, silhouettePaint, outlinePaint);
+    // RIGHT THIGH
+    _drawRRect(canvas, cx + w * 0.02, h * 0.59, w * 0.155, h * 0.23,
+        12.0, silhouettePaint, outlinePaint);
+
+    // LEFT CALF
+    _drawRRect(canvas, cx - w * 0.165, h * 0.815, w * 0.13, h * 0.18,
+        10.0, silhouettePaint, outlinePaint);
+    // RIGHT CALF
+    _drawRRect(canvas, cx + w * 0.035, h * 0.815, w * 0.13, h * 0.18,
+        10.0, silhouettePaint, outlinePaint);
+
+    // ── Muscle zone glows ──────────────────────────────────────────
+    if (isAnterior) {
+      _glowZone(canvas, 'chest', cx - w * 0.185, h * 0.175, w * 0.37,
+          h * 0.155, 8.0);
+      _glowZone(canvas, 'abs', cx - w * 0.155, h * 0.325, w * 0.31,
+          h * 0.175, 8.0);
+      _glowZone(canvas, 'front_deltoids', cx - w * 0.30, h * 0.175,
+          w * 0.10, h * 0.11, 10.0);
+      _glowZone(canvas, 'front_deltoids', cx + w * 0.20, h * 0.175,
+          w * 0.10, h * 0.11, 10.0, mirror: true);
+      _glowZone(canvas, 'biceps', cx - w * 0.30, h * 0.285, w * 0.10,
+          h * 0.21, 10.0);
+      _glowZone(canvas, 'biceps', cx + w * 0.20, h * 0.285, w * 0.10,
+          h * 0.21, 10.0, mirror: true);
+      _glowZone(canvas, 'quadriceps', cx - w * 0.175, h * 0.59,
+          w * 0.155, h * 0.23, 12.0);
+      _glowZone(canvas, 'quadriceps', cx + w * 0.02, h * 0.59,
+          w * 0.155, h * 0.23, 12.0, mirror: true);
+    } else {
+      _glowZone(canvas, 'upper_back', cx - w * 0.185, h * 0.175,
+          w * 0.37, h * 0.145, 8.0);
+      _glowZone(canvas, 'lower_back', cx - w * 0.155, h * 0.315,
+          w * 0.31, h * 0.175, 8.0);
+      _glowZone(canvas, 'triceps', cx - w * 0.30, h * 0.285, w * 0.10,
+          h * 0.22, 10.0);
+      _glowZone(canvas, 'triceps', cx + w * 0.20, h * 0.285, w * 0.10,
+          h * 0.22, 10.0, mirror: true);
+      _glowZone(canvas, 'gluteal', cx - w * 0.175, h * 0.59,
+          w * 0.155, h * 0.11, 12.0);
+      _glowZone(canvas, 'gluteal', cx + w * 0.02, h * 0.59,
+          w * 0.155, h * 0.11, 12.0, mirror: true);
+      _glowZone(canvas, 'hamstring', cx - w * 0.175, h * 0.70,
+          w * 0.155, h * 0.12, 12.0);
+      _glowZone(canvas, 'hamstring', cx + w * 0.02, h * 0.70,
+          w * 0.155, h * 0.12, 12.0, mirror: true);
+      _glowZone(canvas, 'calves', cx - w * 0.165, h * 0.815,
+          w * 0.13, h * 0.18, 10.0);
+      _glowZone(canvas, 'calves', cx + w * 0.035, h * 0.815,
+          w * 0.13, h * 0.18, 10.0, mirror: true);
+    }
+
+    // ── Selected zone pulse ring ───────────────────────────────────
+    if (selectedKey != null) {
+      _drawSelectionRing(canvas, selectedKey!, w, h, cx);
+    }
+
+    // ── Scan-line overlay ──────────────────────────────────────────
+    final scanPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFF00F5FF).withValues(alpha: 0.00),
+          const Color(0xFF00F5FF).withValues(alpha: 0.03),
+          const Color(0xFF00F5FF).withValues(alpha: 0.00),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), scanPaint);
+
+    // ── Side label ─────────────────────────────────────────────────
+    final labelPainter = TextPainter(
+      text: TextSpan(
+        text: isAnterior ? 'ANTERIOR' : 'POSTERIOR',
+        style: const TextStyle(
+          color: Color(0xFF00F5FF),
+          fontSize: 7.5,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.5,
+        ),
+      ),
+      textDirection: ui.TextDirection.ltr,
+    )..layout();
+    labelPainter.paint(
+        canvas, Offset((w - labelPainter.width) / 2, h - 14));
+  }
+
+  // Draws a glowing rounded-rect for a muscle zone
+  void _glowZone(Canvas canvas, String key, double x, double y, double zw,
+      double zh, double radius,
+      {bool mirror = false}) {
+    final a = _alpha(key);
+    final bool isSelected = selectedKey == key;
+    final glowAlpha = isSelected ? (a + 0.25).clamp(0.0, 1.0) : a;
+
+    final fillPaint = Paint()
+      ..color = const Color(0xFF00F5FF).withValues(alpha: glowAlpha * 0.28)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, isSelected ? 14 : 8)
+      ..style = PaintingStyle.fill;
+
+    final borderPaint = Paint()
+      ..color = const Color(0xFF00F5FF).withValues(alpha: glowAlpha * 0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = isSelected ? 1.8 : 0.8;
+
+    final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, y, zw, zh), Radius.circular(radius));
+    canvas.drawRRect(rect, fillPaint);
+    canvas.drawRRect(rect, borderPaint);
+  }
+
+  // Draws a pulsing selection ring around the selected zone
+  void _drawSelectionRing(
+      Canvas canvas, String key, double w, double h, double cx) {
+    Rect zone;
+    switch (key) {
+      case 'chest':
+        zone = Rect.fromLTWH(cx - w * 0.185, h * 0.175, w * 0.37, h * 0.155);
+        break;
+      case 'abs':
+        zone = Rect.fromLTWH(cx - w * 0.155, h * 0.325, w * 0.31, h * 0.175);
+        break;
+      case 'front_deltoids':
+        zone = Rect.fromLTWH(cx - w * 0.30, h * 0.175, w * 0.70, h * 0.11);
+        break;
+      case 'biceps':
+        zone = Rect.fromLTWH(cx - w * 0.31, h * 0.28, w * 0.62, h * 0.22);
+        break;
+      case 'quadriceps':
+        zone = Rect.fromLTWH(cx - w * 0.175, h * 0.59, w * 0.35, h * 0.23);
+        break;
+      case 'upper_back':
+        zone = Rect.fromLTWH(cx - w * 0.185, h * 0.175, w * 0.37, h * 0.145);
+        break;
+      case 'lower_back':
+        zone = Rect.fromLTWH(cx - w * 0.155, h * 0.315, w * 0.31, h * 0.175);
+        break;
+      case 'triceps':
+        zone = Rect.fromLTWH(cx - w * 0.31, h * 0.28, w * 0.62, h * 0.22);
+        break;
+      case 'gluteal':
+        zone = Rect.fromLTWH(cx - w * 0.175, h * 0.59, w * 0.35, h * 0.11);
+        break;
+      case 'hamstring':
+        zone = Rect.fromLTWH(cx - w * 0.175, h * 0.70, w * 0.35, h * 0.12);
+        break;
+      case 'calves':
+        zone = Rect.fromLTWH(cx - w * 0.165, h * 0.815, w * 0.30, h * 0.18);
+        break;
+      default:
+        return;
+    }
+
+    // Outer glow ring
+    final ringPaint = Paint()
+      ..color = const Color(0xFF00F5FF).withValues(alpha: 0.55)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            zone.inflate(5), const Radius.circular(10)),
+        ringPaint);
+
+    // Corner accent lines
+    final accentPaint = Paint()
+      ..color = const Color(0xFF00F5FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8;
+    const cl = 8.0; // corner line length
+    final r = zone.inflate(5);
+    // Top-left
+    canvas.drawLine(r.topLeft, r.topLeft + const Offset(cl, 0), accentPaint);
+    canvas.drawLine(r.topLeft, r.topLeft + const Offset(0, cl), accentPaint);
+    // Top-right
+    canvas.drawLine(r.topRight, r.topRight + const Offset(-cl, 0), accentPaint);
+    canvas.drawLine(r.topRight, r.topRight + const Offset(0, cl), accentPaint);
+    // Bottom-left
+    canvas.drawLine(
+        r.bottomLeft, r.bottomLeft + const Offset(cl, 0), accentPaint);
+    canvas.drawLine(
+        r.bottomLeft, r.bottomLeft + const Offset(0, -cl), accentPaint);
+    // Bottom-right
+    canvas.drawLine(
+        r.bottomRight, r.bottomRight + const Offset(-cl, 0), accentPaint);
+    canvas.drawLine(
+        r.bottomRight, r.bottomRight + const Offset(0, -cl), accentPaint);
+  }
+
+  void _drawRect(Canvas canvas, double x, double y, double rw, double rh,
+      Paint fill, Paint stroke) {
+    final rect = Rect.fromLTWH(x, y, rw, rh);
+    canvas.drawRect(rect, fill);
+    canvas.drawRect(rect, stroke);
+  }
+
+  void _drawRRect(Canvas canvas, double x, double y, double rw, double rh,
+      double r, Paint fill, Paint stroke) {
+    final rect =
+        RRect.fromRectAndRadius(Rect.fromLTWH(x, y, rw, rh), Radius.circular(r));
+    canvas.drawRRect(rect, fill);
+    canvas.drawRRect(rect, stroke);
+  }
+
+  @override
+  bool shouldRepaint(_BodyModelPainter oldDelegate) =>
+      oldDelegate.isAnterior != isAnterior ||
+      oldDelegate.selectedKey != selectedKey ||
+      oldDelegate.muscleStats != muscleStats;
 }

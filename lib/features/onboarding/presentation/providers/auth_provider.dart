@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:local_auth/local_auth.dart';
 import '../../domain/entities/user_profile.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../data/repositories/auth_repository_impl.dart';
@@ -128,10 +129,12 @@ class AuthNotifier extends Notifier<AuthState> {
           await storage.write(key: 'saved_email', value: email.trim());
           await storage.write(key: 'saved_password', value: password);
           await storage.write(key: 'fingerprint_enabled', value: 'true');
+          ref.read(biometricEnabledProvider.notifier).setEnabled(true);
         } else {
           await storage.delete(key: 'saved_email');
           await storage.delete(key: 'saved_password');
           await storage.write(key: 'fingerprint_enabled', value: 'false');
+          ref.read(biometricEnabledProvider.notifier).setEnabled(false);
         }
       }
 
@@ -332,10 +335,99 @@ class AuthNotifier extends Notifier<AuthState> {
       return e.toString();
     }
   }
+
+  /// Enables biometric login in settings
+  Future<String?> enableBiometrics(String password) async {
+    try {
+      final localAuth = LocalAuthentication();
+      final canCheck = await localAuth.canCheckBiometrics;
+      final isSupported = await localAuth.isDeviceSupported();
+      if (!canCheck || !isSupported) {
+        return 'Biometric authentication is not supported or set up on this device.';
+      }
+
+      final authenticated = await localAuth.authenticate(
+        localizedReason: 'Confirm your biometric identity to enable instant login',
+        options: const AuthenticationOptions(
+          biometricOnly: true,
+          stickyAuth: true,
+        ),
+      );
+
+      if (!authenticated) {
+        return 'Biometric authentication cancelled or failed.';
+      }
+
+      final currentUser = fb.FirebaseAuth.instance.currentUser;
+      if (currentUser == null || currentUser.email == null) {
+        return 'No authenticated user found.';
+      }
+
+      const storage = FlutterSecureStorage();
+      await storage.write(key: 'saved_email', value: currentUser.email!.trim());
+      await storage.write(key: 'saved_password', value: password);
+      await storage.write(key: 'fingerprint_enabled', value: 'true');
+
+      ref.read(biometricEnabledProvider.notifier).setEnabled(true);
+      return null;
+    } on PlatformException catch (e) {
+      if (e.code == 'NotAvailable') {
+        return 'Biometrics not available or not set up on this device.';
+      } else if (e.code == 'LockedOut' || e.code == 'PermanentlyLockedOut') {
+        return 'Biometrics locked out due to too many failed attempts. Please use your lock screen passcode or restart the device.';
+      } else {
+        return 'Biometric error: ${e.message ?? e.code}';
+      }
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  /// Disables biometric login in settings
+  Future<String?> disableBiometrics() async {
+    try {
+      const storage = FlutterSecureStorage();
+      await storage.delete(key: 'saved_email');
+      await storage.delete(key: 'saved_password');
+      await storage.write(key: 'fingerprint_enabled', value: 'false');
+
+      ref.read(biometricEnabledProvider.notifier).setEnabled(false);
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
 }
 
 // ─── AUTHENTICATION PROVIDER EXPOSURE ───────────────────────────────
 
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(() {
   return AuthNotifier();
+});
+
+class BiometricEnabledNotifier extends Notifier<bool> {
+  final _storage = const FlutterSecureStorage();
+
+  @override
+  bool build() {
+    _load();
+    return false;
+  }
+
+  Future<void> _load() async {
+    try {
+      final enabled = await _storage.read(key: 'fingerprint_enabled');
+      state = enabled == 'true';
+    } catch (_) {
+      state = false;
+    }
+  }
+
+  void setEnabled(bool value) {
+    state = value;
+  }
+}
+
+final biometricEnabledProvider = NotifierProvider<BiometricEnabledNotifier, bool>(() {
+  return BiometricEnabledNotifier();
 });

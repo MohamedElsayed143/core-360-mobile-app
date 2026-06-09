@@ -11,6 +11,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../onboarding/presentation/providers/auth_provider.dart';
 import '../../domain/entities/routine.dart';
 import '../../../workouts/data/models/workout_session_model.dart';
+import 'analytics_provider.dart';
 
 // ─── TIMER STATE ────────────────────────────────────────────────────────────
 
@@ -170,6 +171,19 @@ class ActiveWorkoutState {
             .where((s) => s.isCompleted)
             .fold(0.0, (setSum, s) => setSum + (s.weight * s.reps)),
   );
+
+  /// Highest raw weight lifted in any completed set
+  double get maxWeightLifted {
+    double maxWeight = 0.0;
+    for (final ex in exercises) {
+      for (final set in ex.sets) {
+        if (set.isCompleted && set.weight > maxWeight) {
+          maxWeight = set.weight;
+        }
+      }
+    }
+    return maxWeight;
+  }
 
   ActiveWorkoutState copyWith({
     Routine? routine,
@@ -460,6 +474,7 @@ class ActiveWorkoutNotifier extends Notifier<ActiveWorkoutState> {
 
       final client = ref.read(firebaseClientProvider);
       await client.sessionsCollection.doc(sessionId).set(sessionModel.toMap());
+      await ref.read(analyticsProvider.notifier).refresh();
 
       state = state.copyWith(isSaving: false, isFinished: true);
     } catch (e) {

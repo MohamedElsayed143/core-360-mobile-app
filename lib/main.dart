@@ -1,8 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb; // جلب أداة كشف الويب
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ إضافة الاستيراد المفقود
 import 'core/theme/app_theme.dart';
 import 'features/onboarding/presentation/providers/auth_provider.dart';
 import 'features/onboarding/presentation/screens/login_screen.dart';
@@ -15,7 +16,6 @@ void main() async {
   bool isFirebaseInitialized = false;
   try {
     if (kIsWeb) {
-      // حقن إعدادات الويب مباشرة في حالة تشغيل جوجل كروم
       await Firebase.initializeApp(
         options: const FirebaseOptions(
           apiKey: "AIzaSyAisFhl-t9gNpZfxjKRg3UeILnkRNdog9s",
@@ -27,7 +27,6 @@ void main() async {
         ),
       );
     } else {
-      // تشغيل الكود الأصلي للموبايل (أندرويد / آيفون)
       await Firebase.initializeApp();
     }
     isFirebaseInitialized = true;
@@ -40,35 +39,65 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerStatefulWidget {
   final bool isFirebaseInitialized;
   const MyApp({super.key, required this.isFirebaseInitialized});
 
   @override
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAndClearInvalidSession();
+    }
+  }
+
+  Future<void> _checkAndClearInvalidSession() async {
+    final authState = ref.read(authProvider);
+    if (authState is AuthenticatedWithProfile || authState is AuthenticatedWithoutProfile) {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        await ref.read(authProvider.notifier).signOut();
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final isFirebaseInitialized = widget.isFirebaseInitialized;
+
     return MaterialApp(
       title: 'Core-360',
       theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,
-      home: RootAuthBridge(isFirebaseInitialized: isFirebaseInitialized),
+      home: _buildHome(authState, isFirebaseInitialized),
     );
   }
-}
 
-class RootAuthBridge extends ConsumerWidget {
-  final bool isFirebaseInitialized;
-  const RootAuthBridge({super.key, required this.isFirebaseInitialized});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget _buildHome(AuthState authState, bool isFirebaseInitialized) {
     if (!isFirebaseInitialized) {
-      return const FirebaseErrorScreen();
+      // ✅ إزالة const لأن FirebaseErrorScreen ليس const
+      return FirebaseErrorScreen();
     }
 
-    final authState = ref.watch(authProvider);
-
     if (authState is AuthInitial) {
-      return const SplashScreen();
+      return SplashScreen();
     } else if (authState is Unauthenticated) {
       return const LoginScreen();
     } else if (authState is AuthenticatedWithoutProfile) {
@@ -76,14 +105,15 @@ class RootAuthBridge extends ConsumerWidget {
     } else if (authState is AuthenticatedWithProfile) {
       return const HomePlaceholderScreen();
     } else if (authState is AuthError) {
+      // ✅ ErrorScreen معرف في الأسفل
       return ErrorScreen(message: authState.message);
     }
 
-    return const SplashScreen();
+    return SplashScreen();
   }
 }
 
-// ─── HIGH-FIDELITY SPLASH / LOADER SCREEN ──────────────────────────────────
+// ─── SPLASH SCREEN ──────────────────────────────────────────────────────────
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -178,7 +208,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-// ─── PREMIUM ERROR LAYOUT ───────────────────────────────────────────────
+// ─── ERROR SCREEN ───────────────────────────────────────────────────────────
 class ErrorScreen extends ConsumerWidget {
   final String message;
   const ErrorScreen({super.key, required this.message});
@@ -234,21 +264,14 @@ class ErrorScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 32),
-                Container(
+                SizedBox(
                   height: 48,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: const LinearGradient(
-                      colors: [Colors.redAccent, Colors.deepOrange],
-                    ),
-                  ),
                   child: ElevatedButton(
                     onPressed: () {
                       ref.read(authProvider.notifier).clearError();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
+                      backgroundColor: Colors.redAccent,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -272,7 +295,7 @@ class ErrorScreen extends ConsumerWidget {
   }
 }
 
-// ─── FIREBASE CONFIGURATION FAULT OVERRIDE SCREEN ──────────────────────────
+// ─── FIREBASE CONFIGURATION ERROR SCREEN ────────────────────────────────────
 class FirebaseErrorScreen extends StatelessWidget {
   const FirebaseErrorScreen({super.key});
 

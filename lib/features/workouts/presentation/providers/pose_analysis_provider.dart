@@ -116,9 +116,12 @@ class PoseAnalysisNotifier extends Notifier<PoseAnalysisState> {
   }
 
   /// Stream frame processor
-  Future<void> processCameraImage(CameraImage image, CameraDescription camera) async {
+  Future<void> processCameraImage(
+    CameraImage image,
+    CameraDescription camera,
+  ) async {
     if (_isProcessing || state.isFinished || state.isSaving) return;
-    
+
     // Throttling: process every 3rd frame to ensure smooth UI layout
     _frameCount++;
     if (_frameCount % 3 != 0) return;
@@ -139,7 +142,7 @@ class PoseAnalysisNotifier extends Notifier<PoseAnalysisState> {
       }
 
       final poses = await detector.processImage(inputImage);
-      
+
       if (poses.isEmpty) {
         state = state.copyWith(
           landmarks: {},
@@ -153,18 +156,25 @@ class PoseAnalysisNotifier extends Notifier<PoseAnalysisState> {
       final firstPose = poses.first;
       final landmarks = firstPose.landmarks;
 
+      final normalizedExercise = state.exerciseName.toLowerCase();
+
       Map<String, dynamic> analysis;
-      if (state.exerciseName.toLowerCase().contains('plank')) {
+      if (normalizedExercise.contains('plank')) {
         analysis = BiomechanicsAnalyzer.analyzePlank(landmarks);
+      } else if (normalizedExercise.contains('press') ||
+          normalizedExercise.contains('overhead') ||
+          normalizedExercise.contains('shoulder')) {
+        analysis = BiomechanicsAnalyzer.analyzeOverheadPress(landmarks);
       } else {
-        // Squat analysis is default
         analysis = BiomechanicsAnalyzer.analyzeSquat(landmarks);
       }
 
       final double score = (analysis['accuracy'] as num).toDouble();
       final String feedback = analysis['feedback'] as String;
       final String status = analysis['status'] as String;
-      final Map<String, String> joints = Map<String, String>.from(analysis['jointStress'] ?? {});
+      final Map<String, String> joints = Map<String, String>.from(
+        analysis['jointStress'] ?? {},
+      );
 
       // Accumulate score history for progress reports
       final updatedHistory = [...state.accuracyHistory, score];
@@ -250,7 +260,7 @@ class PoseAnalysisNotifier extends Notifier<PoseAnalysisState> {
 
       final firebase = ref.read(firebaseClientProvider);
       final userId = auth.user.uid;
-      
+
       final docId = firebase.firestore
           .collection('users')
           .doc(userId)
@@ -271,17 +281,25 @@ class PoseAnalysisNotifier extends Notifier<PoseAnalysisState> {
       final correctionsList = <String>[];
       if (state.exerciseName.toLowerCase().contains('plank')) {
         if (avgScore < 80) {
-          correctionsList.add('Keep body in a straight line without sagging hips.');
-          correctionsList.add('Tighten abdominal core and press elbows into floor.');
+          correctionsList.add(
+            'Keep body in a straight line without sagging hips.',
+          );
+          correctionsList.add(
+            'Tighten abdominal core and press elbows into floor.',
+          );
         }
       } else {
         if (avgScore < 85) {
           correctionsList.add('Lower hips below knees for deep squat flexion.');
-          correctionsList.add('Keep chest upright and back straight during descent.');
+          correctionsList.add(
+            'Keep chest upright and back straight during descent.',
+          );
         }
       }
       if (correctionsList.isEmpty) {
-        correctionsList.add('Posture looks fantastic! Continue regular training split.');
+        correctionsList.add(
+          'Posture looks fantastic! Continue regular training split.',
+        );
       }
 
       final result = PoseAnalysisResultModel(
@@ -325,11 +343,7 @@ class PoseAnalysisNotifier extends Notifier<PoseAnalysisState> {
         'date': Timestamp.now(),
       });
 
-      state = state.copyWith(
-        isSaving: false,
-        isFinished: true,
-        savedId: docId,
-      );
+      state = state.copyWith(isSaving: false, isFinished: true, savedId: docId);
     } catch (e) {
       debugPrint('Firestore pose analysis saving failed: $e');
       state = state.copyWith(isSaving: false);
@@ -344,4 +358,6 @@ class PoseAnalysisNotifier extends Notifier<PoseAnalysisState> {
 }
 
 final poseAnalysisProvider =
-    NotifierProvider<PoseAnalysisNotifier, PoseAnalysisState>(PoseAnalysisNotifier.new);
+    NotifierProvider<PoseAnalysisNotifier, PoseAnalysisState>(
+      PoseAnalysisNotifier.new,
+    );

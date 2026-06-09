@@ -188,7 +188,7 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
       childAspectRatio: 1.35,
       children: [
         _buildKpiCard(
-          'TOTAL VOLUME',
+          'ACCUMULATED LOAD',
           state.totalVolume.toStringAsFixed(0),
           'KG',
           AppTheme.cyberCyan,
@@ -780,7 +780,9 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
     final name = muscle.$2;
     final stat = state.muscleStats[key];
     final sets = stat?.totalSets ?? 0;
+    final totalReps = stat?.totalReps ?? 0;
     final vol = stat?.totalVolume ?? 0.0;
+    final maxWeight = stat?.maxWeight ?? 0.0;
     final exercises = stat?.topExercises ?? [];
 
     return AnimatedOpacity(
@@ -830,11 +832,14 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
               ],
             ),
             const SizedBox(height: 10),
-            Row(
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
               children: [
-                _buildZoomStat('SETS', '$sets'),
-                const SizedBox(width: 16),
-                _buildZoomStat('VOLUME', '${vol.toStringAsFixed(0)} kg'),
+                _buildZoomStat('MAX WEIGHT', '${maxWeight.toStringAsFixed(1)} kg'),
+                _buildZoomStat('TOTAL SETS', '$sets Sets'),
+                _buildZoomStat('TOTAL REPS', '$totalReps Reps'),
+                _buildZoomStat('TOTAL VOLUME', '${vol.toStringAsFixed(0)} kg'),
               ],
             ),
             if (exercises.isNotEmpty) ...[
@@ -970,16 +975,19 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
   Widget _buildMuscleRowItem(AnalyticsState state, String key, String name) {
     final stat = state.muscleStats[key];
     final sets = stat?.totalSets ?? 0;
+    final totalReps = stat?.totalReps ?? 0;
+    final maxWeight = stat?.maxWeight ?? 0.0;
+    final totalVolume = stat?.totalVolume ?? 0.0;
     final isSelected = _selectedMuscleKey == key;
 
     Color neonColor = AppTheme.cyberCyan;
     double opacity = 0.03;
     if (sets >= 9) {
-      opacity = 0.45;
+      opacity = 0.72;
     } else if (sets >= 4) {
-      opacity = 0.24;
+      opacity = 0.42;
     } else if (sets >= 1) {
-      opacity = 0.12;
+      opacity = 0.22;
     }
 
     return GestureDetector(
@@ -1031,22 +1039,32 @@ class _AnalyticsDashboardScreenState extends ConsumerState<AnalyticsDashboardScr
                 ),
               ),
             ),
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '$sets',
+                  sets > 0 ? 'MAX ${maxWeight.toStringAsFixed(0)} KG' : 'NO DATA',
                   style: GoogleFonts.outfit(
-                    fontSize: 11,
+                    fontSize: 9,
                     fontWeight: FontWeight.bold,
                     color: sets > 0 ? neonColor : AppTheme.textMuted,
                   ),
                 ),
-                const SizedBox(width: 3),
+                const SizedBox(height: 2),
                 Text(
-                  'SETS',
+                  sets > 0 ? '$sets SETS • $totalReps REPS' : '0 SETS • 0 REPS',
                   style: GoogleFonts.outfit(
                     fontSize: 8,
-                    color: AppTheme.textMuted,
+                    color: sets > 0 ? AppTheme.textSub : AppTheme.textMuted,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  sets > 0 ? 'VOL ${totalVolume.toStringAsFixed(0)} KG' : 'VOL 0 KG',
+                  style: GoogleFonts.outfit(
+                    fontSize: 8,
+                    color: sets > 0 ? AppTheme.textSub : AppTheme.textMuted,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -1079,11 +1097,11 @@ class _BodyModelPainter extends CustomPainter {
   // Returns glow alpha [0..1] for a given muscle key
   double _alpha(String key) {
     final s = muscleStats[key]?.totalSets ?? 0;
-    if (s >= 12) return 0.85;
-    if (s >= 8) return 0.65;
-    if (s >= 4) return 0.42;
-    if (s >= 1) return 0.22;
-    return 0.06;
+    if (s >= 12) return 0.95;
+    if (s >= 8) return 0.8;
+    if (s >= 4) return 0.6;
+    if (s >= 1) return 0.35;
+    return 0.08;
   }
 
   @override
@@ -1249,14 +1267,14 @@ class _BodyModelPainter extends CustomPainter {
     final glowAlpha = isSelected ? (a + 0.25).clamp(0.0, 1.0) : a;
 
     final fillPaint = Paint()
-      ..color = const Color(0xFF00F5FF).withValues(alpha: glowAlpha * 0.28)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, isSelected ? 14 : 8)
+      ..color = const Color(0xFF00F5FF).withValues(alpha: glowAlpha * 0.45)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, isSelected ? 18 : 10)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
-      ..color = const Color(0xFF00F5FF).withValues(alpha: glowAlpha * 0.7)
+      ..color = const Color(0xFF00F5FF).withValues(alpha: glowAlpha * 0.95)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = isSelected ? 1.8 : 0.8;
+      ..strokeWidth = isSelected ? 2.2 : 1.2;
 
     final rect = RRect.fromRectAndRadius(
         Rect.fromLTWH(x, y, zw, zh), Radius.circular(radius));

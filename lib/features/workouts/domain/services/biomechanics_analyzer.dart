@@ -3,11 +3,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 class BiomechanicsAnalyzer {
   /// Calculate the angle between three landmarks B (vertex), A, C
-  static double calculateAngle(
-    PoseLandmark a,
-    PoseLandmark b,
-    PoseLandmark c,
-  ) {
+  static double calculateAngle(PoseLandmark a, PoseLandmark b, PoseLandmark c) {
     // Vector AB
     final double abX = a.x - b.x;
     final double abY = a.y - b.y;
@@ -36,22 +32,56 @@ class BiomechanicsAnalyzer {
     return rad * (180.0 / math.pi);
   }
 
+  static double calculateTorsoAlignmentAngle(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
+    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    final leftHip = landmarks[PoseLandmarkType.leftHip];
+    final rightHip = landmarks[PoseLandmarkType.rightHip];
+
+    if (leftShoulder == null ||
+        rightShoulder == null ||
+        leftHip == null ||
+        rightHip == null) {
+      return 180.0;
+    }
+
+    final shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2.0;
+    final shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2.0;
+    final hipMidX = (leftHip.x + rightHip.x) / 2.0;
+    final hipMidY = (leftHip.y + rightHip.y) / 2.0;
+
+    final double deltaX = hipMidX - shoulderMidX;
+    final double deltaY = hipMidY - shoulderMidY;
+
+    if (deltaY.abs() < 1e-6) return 90.0;
+
+    return math.atan2(deltaX.abs(), deltaY.abs()) * (180.0 / math.pi);
+  }
+
   /// Analyze Squat biomechanics using skeletal landmarks
   /// Returns a Map containing:
   /// - 'accuracy': double (0 to 100)
   /// - 'feedback': String
   /// - 'status': String ('GOOD', 'WARNING', 'HAZARD')
   /// - 'jointStress': `Map<String, String>` (individual joint status)
-  static Map<String, dynamic> analyzeSquat(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  static Map<String, dynamic> analyzeSquat(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
     final leftHip = landmarks[PoseLandmarkType.leftHip];
     final leftKnee = landmarks[PoseLandmarkType.leftKnee];
     final leftAnkle = landmarks[PoseLandmarkType.leftAnkle];
     final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
 
-    if (leftHip == null || leftKnee == null || leftAnkle == null || leftShoulder == null) {
+    if (leftHip == null ||
+        leftKnee == null ||
+        leftAnkle == null ||
+        leftShoulder == null) {
       return {
         'accuracy': 0.0,
-        'feedback': 'CALIBRATING: Stand sideways and ensure shoulders, hips, knees, and ankles are in frame.',
+        'feedback':
+            'CALIBRATING: Stand sideways and ensure shoulders, hips, knees, and ankles are in frame.',
         'status': 'WARNING',
         'jointStress': {'knees': 'CALIBRATING', 'back': 'CALIBRATING'},
       };
@@ -62,6 +92,7 @@ class BiomechanicsAnalyzer {
 
     // 2. Calculate Torso Alignment/Back angle (Shoulder-Hip-Knee)
     final backAngle = calculateAngle(leftShoulder, leftHip, leftKnee);
+    final torsoLeanAngle = calculateTorsoAlignmentAngle(landmarks);
 
     double accuracy = 100.0;
     String feedback = 'Form looks good! Maintain rhythm.';
@@ -70,12 +101,13 @@ class BiomechanicsAnalyzer {
     String backStatus = 'GOOD';
 
     // Rule: Back straightness (Shoulder-Hip-Knee). Under 135 deg is severe leaning forward.
-    if (backAngle < 135.0) {
+    if (backAngle < 135.0 || torsoLeanAngle > 20.0) {
       accuracy -= 35.0;
-      feedback = 'Alert: Leaning too far forward! Keep your chest upright.';
+      feedback =
+          'Alert: Keep your back straight! Stack your torso over your hips.';
       backStatus = 'CRITICAL';
       status = 'HAZARD';
-    } else if (backAngle < 150.0) {
+    } else if (backAngle < 150.0 || torsoLeanAngle > 12.0) {
       accuracy -= 15.0;
       feedback = 'Warning: Arching back. Keep chest up and back straight.';
       backStatus = 'WARNING';
@@ -94,7 +126,8 @@ class BiomechanicsAnalyzer {
       // shallow squat
       accuracy -= 20.0;
       kneeStatus = 'WARNING';
-      feedback = 'Squat depth is shallow! Sit deeper, lower your hips past knees.';
+      feedback =
+          'Squat depth is shallow! Sit deeper, lower your hips past knees.';
       if (status == 'GOOD') status = 'WARNING';
     } else {
       // great depth
@@ -108,15 +141,72 @@ class BiomechanicsAnalyzer {
       'accuracy': accuracy,
       'feedback': feedback,
       'status': status,
-      'jointStress': {
-        'knees': kneeStatus,
-        'back': backStatus,
-      },
+      'jointStress': {'knees': kneeStatus, 'back': backStatus},
+    };
+  }
+
+  static Map<String, dynamic> analyzeOverheadPress(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
+    final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
+    final rightShoulder = landmarks[PoseLandmarkType.rightShoulder];
+    final leftHip = landmarks[PoseLandmarkType.leftHip];
+    final rightHip = landmarks[PoseLandmarkType.rightHip];
+    final leftElbow = landmarks[PoseLandmarkType.leftElbow];
+    final rightElbow = landmarks[PoseLandmarkType.rightElbow];
+
+    if (leftShoulder == null ||
+        rightShoulder == null ||
+        leftHip == null ||
+        rightHip == null ||
+        leftElbow == null ||
+        rightElbow == null) {
+      return {
+        'accuracy': 0.0,
+        'feedback':
+            'CALIBRATING: Align shoulders, hips, and elbows in frame for the press.',
+        'status': 'WARNING',
+        'jointStress': {'torso': 'CALIBRATING', 'shoulders': 'CALIBRATING'},
+      };
+    }
+
+    final torsoLeanAngle = calculateTorsoAlignmentAngle(landmarks);
+
+    double accuracy = 100.0;
+    String feedback = 'Form correct! Keep your ribs stacked over your hips.';
+    String status = 'GOOD';
+    String torsoStatus = 'GOOD';
+    String shoulderStatus = 'GOOD';
+
+    if (torsoLeanAngle > 20.0) {
+      accuracy -= 35.0;
+      feedback =
+          'Alert: Keep your back straight! Your torso is leaning too far.';
+      torsoStatus = 'CRITICAL';
+      shoulderStatus = 'WARNING';
+      status = 'HAZARD';
+    } else if (torsoLeanAngle > 12.0) {
+      accuracy -= 18.0;
+      feedback =
+          'Warning: Slight torso drift. Keep your ribs stacked and back straight.';
+      torsoStatus = 'WARNING';
+      if (status == 'GOOD') status = 'WARNING';
+    }
+
+    accuracy = accuracy.clamp(0.0, 100.0);
+
+    return {
+      'accuracy': accuracy,
+      'feedback': feedback,
+      'status': status,
+      'jointStress': {'torso': torsoStatus, 'shoulders': shoulderStatus},
     };
   }
 
   /// Analyze Plank alignment using skeletal landmarks
-  static Map<String, dynamic> analyzePlank(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+  static Map<String, dynamic> analyzePlank(
+    Map<PoseLandmarkType, PoseLandmark> landmarks,
+  ) {
     final leftShoulder = landmarks[PoseLandmarkType.leftShoulder];
     final leftHip = landmarks[PoseLandmarkType.leftHip];
     final leftKnee = landmarks[PoseLandmarkType.leftKnee];
@@ -145,13 +235,15 @@ class BiomechanicsAnalyzer {
       hipStatus = 'CRITICAL';
       coreStatus = 'CRITICAL';
       status = 'HAZARD';
-      feedback = 'Danger: Sagging or high hips detected! Engage your core and flatten your body.';
+      feedback =
+          'Danger: Sagging or high hips detected! Engage your core and flatten your body.';
     } else if (bodyAngle < 168.0) {
       accuracy -= 20.0;
       hipStatus = 'WARNING';
       coreStatus = 'WARNING';
       status = 'WARNING';
-      feedback = 'Warning: Hip alignment is uneven. Keep body in a straight line.';
+      feedback =
+          'Warning: Hip alignment is uneven. Keep body in a straight line.';
     }
 
     accuracy = accuracy.clamp(0.0, 100.0);
@@ -160,10 +252,7 @@ class BiomechanicsAnalyzer {
       'accuracy': accuracy,
       'feedback': feedback,
       'status': status,
-      'jointStress': {
-        'hips': hipStatus,
-        'core': coreStatus,
-      },
+      'jointStress': {'hips': hipStatus, 'core': coreStatus},
     };
   }
 }

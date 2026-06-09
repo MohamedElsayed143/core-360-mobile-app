@@ -37,10 +37,19 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
         _showError('No cameras found on device.');
         return;
       }
-      
-      // Select the rear camera by default, or front if rear is unavailable
-      final rearCameraIndex = _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.back);
-      _selectedCameraIndex = rearCameraIndex != -1 ? rearCameraIndex : 0;
+
+      // Prefer the front camera for the form-check experience, falling back to the rear camera if needed.
+      final frontCameraIndex = _cameras.indexWhere(
+        (c) => c.lensDirection == CameraLensDirection.front,
+      );
+      final rearCameraIndex = _cameras.indexWhere(
+        (c) => c.lensDirection == CameraLensDirection.back,
+      );
+      _selectedCameraIndex = frontCameraIndex != -1
+          ? frontCameraIndex
+          : rearCameraIndex != -1
+          ? rearCameraIndex
+          : 0;
 
       await _startCamera();
     } catch (e) {
@@ -50,7 +59,7 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
 
   Future<void> _startCamera() async {
     if (_cameras.isEmpty) return;
-    
+
     setState(() => _isCameraReady = false);
     _cameraController?.dispose();
 
@@ -69,7 +78,9 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
       // Start the frame stream to feed the provider
       _cameraController!.startImageStream((image) {
         if (mounted && _cameraController != null) {
-          ref.read(poseAnalysisProvider.notifier).processCameraImage(image, camera);
+          ref
+              .read(poseAnalysisProvider.notifier)
+              .processCameraImage(image, camera);
         }
       });
     } catch (e) {
@@ -81,7 +92,10 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message, style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          content: Text(
+            message,
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -108,13 +122,11 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
   void _triggerFinish() async {
     final notifier = ref.read(poseAnalysisProvider.notifier);
     await notifier.saveAnalysisSession();
-    
+
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (context) => const PoseReportScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const PoseReportScreen()),
       );
     }
   }
@@ -133,7 +145,15 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
             Center(
               child: AspectRatio(
                 aspectRatio: _cameraController!.value.aspectRatio,
-                child: CameraPreview(_cameraController!),
+                child:
+                    _cameras[_selectedCameraIndex].lensDirection ==
+                        CameraLensDirection.front
+                    ? Transform(
+                        alignment: Alignment.center,
+                        transform: Matrix4.diagonal3Values(-1.0, 1.0, 1.0),
+                        child: CameraPreview(_cameraController!),
+                      )
+                    : CameraPreview(_cameraController!),
               ),
             )
           else
@@ -156,8 +176,10 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
                       _cameraController!.value.previewSize!.height,
                       _cameraController!.value.previewSize!.width,
                     ),
-                    InputImageRotation.rotation90deg, // default stream preset rotation
-                    _cameras[_selectedCameraIndex].lensDirection == CameraLensDirection.front,
+                    InputImageRotation
+                        .rotation90deg, // default stream preset rotation
+                    _cameras[_selectedCameraIndex].lensDirection ==
+                        CameraLensDirection.front,
                   ),
                 ),
               ),
@@ -215,12 +237,12 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
         decoration: BoxDecoration(
           color: AppTheme.darkSurface.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: glowColor.withValues(alpha: 0.4), width: 1.5),
+          border: Border.all(
+            color: glowColor.withValues(alpha: 0.4),
+            width: 1.5,
+          ),
           boxShadow: [
-            BoxShadow(
-              color: glowColor.withValues(alpha: 0.08),
-              blurRadius: 20,
-            ),
+            BoxShadow(color: glowColor.withValues(alpha: 0.08), blurRadius: 20),
           ],
         ),
         child: Row(
@@ -293,7 +315,11 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textSub, size: 16),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: AppTheme.textSub,
+                  size: 16,
+                ),
                 onPressed: () {
                   ref.read(poseAnalysisProvider.notifier).reset();
                   Navigator.pop(context);
@@ -317,7 +343,9 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
               decoration: BoxDecoration(
                 color: Colors.redAccent.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: Colors.redAccent.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
@@ -344,7 +372,11 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
             )
           else if (_cameras.length > 1)
             IconButton(
-              icon: const Icon(Icons.flip_camera_ios_outlined, color: AppTheme.textSub, size: 20),
+              icon: const Icon(
+                Icons.flip_camera_ios_outlined,
+                color: AppTheme.textSub,
+                size: 20,
+              ),
               onPressed: _toggleCamera,
             ),
         ],
@@ -367,7 +399,10 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
             height: 380,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(32),
-              border: Border.all(color: AppTheme.cyberCyan.withValues(alpha: 0.4), width: 2.0),
+              border: Border.all(
+                color: AppTheme.cyberCyan.withValues(alpha: 0.4),
+                width: 2.0,
+              ),
             ),
             child: Stack(
               children: [
@@ -425,11 +460,17 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.darkSurface,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppTheme.cardBorderColor, width: 1.2),
+                  border: Border.all(
+                    color: AppTheme.cardBorderColor,
+                    width: 1.2,
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -508,7 +549,7 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
               color: AppTheme.cyberCyan.withValues(alpha: 0.6),
               blurRadius: 10,
               spreadRadius: 2,
-            )
+            ),
           ],
         ),
       ),
@@ -522,10 +563,14 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.cyberCyan.withValues(alpha: 0.08) : Colors.transparent,
+          color: isSelected
+              ? AppTheme.cyberCyan.withValues(alpha: 0.08)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppTheme.cyberCyan.withValues(alpha: 0.5) : AppTheme.textMuted,
+            color: isSelected
+                ? AppTheme.cyberCyan.withValues(alpha: 0.5)
+                : AppTheme.textMuted,
             width: 1.2,
           ),
         ),
@@ -593,17 +638,27 @@ class _PoseAnalysisScreenState extends ConsumerState<PoseAnalysisScreen> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
                 child: Row(
                   children: [
                     if (state.isSaving)
                       const SizedBox(
                         width: 14,
                         height: 14,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
                       )
                     else
-                      const Icon(Icons.emoji_events_outlined, color: Colors.white, size: 16),
+                      const Icon(
+                        Icons.emoji_events_outlined,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     const SizedBox(width: 8),
                     Text(
                       'FINISH SESSION',
@@ -639,7 +694,12 @@ class PosePainter extends CustomPainter {
   final InputImageRotation rotation;
   final bool isFrontCamera;
 
-  PosePainter(this.landmarks, this.imageSize, this.rotation, this.isFrontCamera);
+  PosePainter(
+    this.landmarks,
+    this.imageSize,
+    this.rotation,
+    this.isFrontCamera,
+  );
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -654,6 +714,12 @@ class PosePainter extends CustomPainter {
       ..color = AppTheme.electricBlue.withValues(alpha: 0.8)
       ..strokeWidth = 3.0
       ..strokeCap = StrokeCap.round;
+
+    final paintTorsoLine = Paint()
+      ..color = AppTheme.cyberCyan
+      ..strokeWidth = 4.5
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
 
     // Standard scale translation (camera format preview size orientation layout mapping)
     Offset translate(PoseLandmark landmark) {
@@ -684,8 +750,34 @@ class PosePainter extends CustomPainter {
       }
     }
 
+    // Draw the torso/ribcage boundary in a bright cyan glow to highlight alignment.
+    void drawTorsoConnection(PoseLandmarkType t1, PoseLandmarkType t2) {
+      final p1 = landmarks[t1];
+      final p2 = landmarks[t2];
+      if (p1 != null && p2 != null) {
+        canvas.drawLine(translate(p1), translate(p2), paintTorsoLine);
+      }
+    }
+
+    drawTorsoConnection(
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.rightShoulder,
+    );
+    drawTorsoConnection(PoseLandmarkType.leftHip, PoseLandmarkType.rightHip);
+    drawTorsoConnection(
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.leftHip,
+    );
+    drawTorsoConnection(
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.rightHip,
+    );
+
     // Draw main body skeleton skeletal lines
-    drawConnection(PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder);
+    drawConnection(
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.rightShoulder,
+    );
     drawConnection(PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip);
     drawConnection(PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip);
     drawConnection(PoseLandmarkType.leftHip, PoseLandmarkType.rightHip);

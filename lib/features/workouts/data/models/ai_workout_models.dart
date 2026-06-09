@@ -5,6 +5,7 @@ class AiWorkoutRequest {
   final String focus;
   final String injuries;
   final List<String> availableExercises;
+  final String weightFieldGuidance;
 
   AiWorkoutRequest({
     required this.goal,
@@ -13,6 +14,8 @@ class AiWorkoutRequest {
     required this.focus,
     required this.injuries,
     required this.availableExercises,
+    this.weightFieldGuidance =
+        'For the weight field, use a single numeric value when the load is constant across all sets. If the plan uses different weights per set, enter the highest weight the user has used.',
   });
 
   Map<String, dynamic> toJson() {
@@ -23,6 +26,7 @@ class AiWorkoutRequest {
       'focus': focus,
       'injuries': injuries,
       'availableExercises': availableExercises,
+      'weightFieldGuidance': weightFieldGuidance,
     };
   }
 }

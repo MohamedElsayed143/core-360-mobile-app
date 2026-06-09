@@ -173,7 +173,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
         Column(
           children: [
             // ── TIMER HUD ───────────────────────────────────────────
-            _TimerHud(),
+            const _TimerHud(),
             const SizedBox(height: 12),
 
             // ── EXERCISE NAV DOTS ────────────────────────────────────
@@ -767,7 +767,7 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
       builder: (_) => _TrophySheet(
         routineName: state.routine?.name ?? 'Workout',
         durationFormatted: timerState.formatted,
-        totalWeightKg: state.totalWeightKg,
+        maxWeightLifted: state.maxWeightLifted,   // ← NEW: peak weight
         completedPercentage: state.completedPercentage,
         completedSets: state.completedSets,
         totalSets: state.totalSets,
@@ -784,6 +784,8 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
 // ─── DECOUPLED TIMER HUD WIDGET ───────────────────────────────────────────────
 
 class _TimerHud extends ConsumerWidget {
+  const _TimerHud();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final formatted = ref.watch(
@@ -1104,12 +1106,12 @@ class _SetLedgerRowState extends State<_SetLedgerRow> {
   }
 }
 
-// ─── POST-WORKOUT TROPHY SHEET ─────────────────────────────────────────────────
+// ─── POST-WORKOUT TROPHY SHEET (MODIFIED: shows MAX WEIGHT instead of TOTAL VOLUME) ───
 
 class _TrophySheet extends StatelessWidget {
   final String routineName;
   final String durationFormatted;
-  final double totalWeightKg;
+  final double maxWeightLifted;   // ← changed from totalWeightKg
   final double completedPercentage;
   final int completedSets;
   final int totalSets;
@@ -1118,7 +1120,7 @@ class _TrophySheet extends StatelessWidget {
   const _TrophySheet({
     required this.routineName,
     required this.durationFormatted,
-    required this.totalWeightKg,
+    required this.maxWeightLifted,
     required this.completedPercentage,
     required this.completedSets,
     required this.totalSets,
@@ -1178,15 +1180,15 @@ class _TrophySheet extends StatelessWidget {
             ),
             const SizedBox(height: 28),
 
-            // Metrics grid
+            // Metrics grid - NEW: display max weight
             Row(
               children: [
                 _metricTile('DURATION', durationFormatted, Icons.timer_outlined,
                     AppTheme.cyberCyan),
                 const SizedBox(width: 12),
                 _metricTile(
-                    'WEIGHT LIFTED',
-                    '${totalWeightKg.toStringAsFixed(1)} kg',
+                    'PEAK LOAD',                     // changed label
+                    maxWeightLifted == 0 ? 'BODYWEIGHT' : '${maxWeightLifted.toStringAsFixed(0)} kg',
                     Icons.fitness_center,
                     AppTheme.electricBlue),
               ],

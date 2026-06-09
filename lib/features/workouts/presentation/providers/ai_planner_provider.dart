@@ -21,6 +21,46 @@ class Wrap<T> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+double parseWorkoutWeightValue(String weightStr) {
+  final normalized = weightStr.trim();
+  if (normalized.isEmpty) return 0.0;
+
+  final lower = normalized.toLowerCase();
+  if (lower.contains('bodyweight') || lower.contains('body') || lower.contains('bw')) {
+    return 0.0;
+  }
+
+  final compactValue = normalized
+      .replaceAll(RegExp(r'kg', caseSensitive: false), '')
+      .replaceAll(RegExp(r'lbs?', caseSensitive: false), '')
+      .replaceAll(RegExp(r'[^0-9.,/\-+ ]'), ' ')
+      .trim();
+
+  final matches = RegExp(r'\d+(?:\.\d+)?').allMatches(compactValue);
+  if (matches.isEmpty) return 0.0;
+
+  final numbers = matches
+      .map((match) => double.tryParse(match.group(0)!) ?? 0.0)
+      .toList();
+
+  if (numbers.length == 1) return numbers.first;
+
+  return numbers.reduce((currentMax, value) => value > currentMax ? value : currentMax);
+}
+
+double normalizeRoutineWeightValue(double rawWeight, int reps) {
+  if (rawWeight <= 0 || reps <= 0) return rawWeight;
+
+  if (rawWeight > 100 && rawWeight % reps == 0) {
+    final perSetWeight = rawWeight / reps;
+    if (perSetWeight <= 100 && perSetWeight >= 1) {
+      return perSetWeight;
+    }
+  }
+
+  return rawWeight;
+}
+
 class AiPlannerState {
   final int step; // 0 to 3
   final String experienceLevel; // 'beginner', 'intermediate', 'advanced'
@@ -127,15 +167,7 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
   }
 
   double _parseWeight(String weightStr) {
-    final lower = weightStr.toLowerCase();
-    if (lower.contains('bodyweight') || lower.contains('body')) {
-      return 0.0;
-    }
-    final match = RegExp(r'[\d.]+').firstMatch(weightStr);
-    if (match != null) {
-      return double.tryParse(match.group(0)!) ?? 0.0;
-    }
-    return 0.0;
+    return parseWorkoutWeightValue(weightStr);
   }
 
   Future<Routine?> generateAiRoutine() async {
@@ -238,10 +270,11 @@ class AiPlannerNotifier extends Notifier<AiPlannerState> {
         // Safely parse reps and weight strings into Config List
         final parsedReps = _parseReps(apiEx.reps);
         final parsedWeight = _parseWeight(apiEx.weightKg);
+        final normalizedWeight = normalizeRoutineWeightValue(parsedWeight, parsedReps);
 
         final setsList = List.generate(
           apiEx.sets > 0 ? apiEx.sets : 3,
-          (_) => SetConfig(reps: parsedReps, weight: parsedWeight),
+          (_) => SetConfig(reps: parsedReps, weight: normalizedWeight),
         );
 
         exercises.add(

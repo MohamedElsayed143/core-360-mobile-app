@@ -566,7 +566,9 @@ class ApiClient {
     final exercises = selected.map((ex) {
       final sets = setsBase + (Random().nextInt(2)); // +/-0 or 1
       final reps = repsBase + (Random().nextInt(4) - 2); // +/-2
-      final weightKg = experience.contains('beginner') ? 'Bodyweight' : '${(repsBase * 2.5).round()} kg';
+      final weightKg = experience.contains('beginner')
+          ? 'Bodyweight'
+          : '${(repsBase * 2.5 + (Random().nextInt(5) * 2.5)).round()} kg';
       return AiWorkoutExercise(
         name: ex['name']!,
         sets: sets.clamp(2, 5),

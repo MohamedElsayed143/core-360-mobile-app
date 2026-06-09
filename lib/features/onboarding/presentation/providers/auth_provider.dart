@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
@@ -165,6 +166,19 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  Future<void> _resetForAuthFailure() async {
+    try {
+      await disableBiometrics();
+    } catch (_) {}
+
+    try {
+      await _authRepository.signOut();
+    } catch (_) {}
+
+    if (!ref.mounted) return;
+    state = const Unauthenticated();
+  }
+
   /// Authenticates with cached biometric credentials.
   /// Catches PlatformException from local_auth channel separately
   /// to provide clear biometric-specific error messages.
@@ -174,13 +188,16 @@ class AuthNotifier extends Notifier<AuthState> {
       await _authRepository.signInWithEmailAndPassword(email, password);
     } on fb.FirebaseAuthException catch (e) {
       if (!ref.mounted) return;
-      state = AuthError(e.message ?? 'Biometric credentials expired. Please sign in manually.');
+      await _resetForAuthFailure();
+      debugPrint('Biometric auto-login failed: ${e.code} - ${e.message ?? 'No message'}');
     } on PlatformException catch (e) {
       if (!ref.mounted) return;
-      state = AuthError('Biometric platform error: ${e.message ?? e.code}');
+      await _resetForAuthFailure();
+      debugPrint('Biometric platform error during auto-login: ${e.code} - ${e.message ?? 'No message'}');
     } catch (e) {
       if (!ref.mounted) return;
-      state = AuthError(e.toString());
+      await _resetForAuthFailure();
+      debugPrint('Biometric auto-login unexpected error: $e');
     }
   }
 
@@ -200,12 +217,10 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  /// Clears any auth errors and returns user to standard layout checks
-  void clearError() {
+  /// Clears any auth errors and returns user to the onboarding/login flow.
+  Future<void> clearError() async {
     if (state is AuthError) {
-      // Re-evaluate session states
-      final currentUser = fb.FirebaseAuth.instance.currentUser;
-      _onAuthStateChanged(currentUser);
+      await _resetForAuthFailure();
     }
   }
 

@@ -13,13 +13,17 @@ import 'workout_provider.dart';
 class MuscleStat {
   final String muscleName;
   final int totalSets;
+  final int totalReps;
   final double totalVolume;
+  final double maxWeight; // Highest raw weight used (not multiplied by reps)
   final List<String> topExercises;
 
   MuscleStat({
     required this.muscleName,
     required this.totalSets,
+    required this.totalReps,
     required this.totalVolume,
+    required this.maxWeight,
     required this.topExercises,
   });
 }
@@ -79,11 +83,39 @@ class AnalyticsState {
 // ─── ANALYTICS NOTIFIER ──────────────────────────────────────────────────────
 
 class AnalyticsNotifier extends Notifier<AnalyticsState> {
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sessionsSubscription;
+
   @override
   AnalyticsState build() {
-    // Initialise loading stats
+    ref.onDispose(() {
+      _sessionsSubscription?.cancel();
+    });
+
+    final auth = ref.read(authProvider);
+    if (auth is AuthenticatedWithProfile) {
+      _subscribeToSessions(auth.user.uid);
+    }
+
     Future.microtask(() => refresh());
     return AnalyticsState();
+  }
+
+  void _subscribeToSessions(String uid) {
+    _sessionsSubscription?.cancel();
+    final firebase = ref.read(firebaseClientProvider);
+
+    _sessionsSubscription = firebase.sessionsCollection
+        .where('userId', isEqualTo: uid)
+        .snapshots()
+        .listen(
+          (_) {
+            if (!ref.mounted) return;
+            Future.microtask(() => refresh());
+          },
+          onError: (error) {
+            debugPrint('Analytics session stream error: $error');
+          },
+        );
   }
 
   void setLookbackDays(int days) {
@@ -145,69 +177,26 @@ class AnalyticsNotifier extends Notifier<AnalyticsState> {
       // 5. Aggregate KPIs
       double aggregatedVolume = 0.0;
       int aggregatedDurationSec = 0;
-      
       final Map<DateTime, double> dailyVolume = {};
-      final Map<String, List<double>> muscleRepsCount = {};
-      final Map<String, Map<String, int>> muscleExerciseCounts = {}; // Muscle -> {ExerciseTitle: count}
+      final muscleStats = aggregateMuscleStats(sessions, exerciseMuscleMap);
 
       for (final session in sessions) {
-        aggregatedVolume += session.totalWeightKg;
         aggregatedDurationSec += session.durationSeconds;
+
+        double sessionVolume = 0.0;
+        for (final exercise in session.exercises) {
+          for (final set in exercise.sets) {
+            if (set.isCompleted) {
+              sessionVolume += set.reps * set.weight;
+            }
+          }
+        }
+
+        aggregatedVolume += sessionVolume;
 
         // Group volume by date
         final date = DateTime(session.startTime.year, session.startTime.month, session.startTime.day);
-        dailyVolume[date] = (dailyVolume[date] ?? 0.0) + session.totalWeightKg;
-
-        // Process muscles
-        for (final ex in session.exercises) {
-          var targetMuscle = exerciseMuscleMap[ex.workoutId] ?? 'full_body';
-          if (targetMuscle == 'full_body') {
-            final titleLower = ex.title.toLowerCase();
-            if (titleLower.contains('bench press') || titleLower.contains('push-up') || titleLower.contains('chest')) {
-              targetMuscle = 'chest';
-            } else if (titleLower.contains('squat') || titleLower.contains('lunge') || titleLower.contains('quad')) {
-              targetMuscle = 'quadriceps';
-            } else if (titleLower.contains('curl') || titleLower.contains('bicep')) {
-              targetMuscle = 'biceps';
-            } else if (titleLower.contains('plank') || titleLower.contains('crunch') || titleLower.contains('raise')) {
-              targetMuscle = 'abs';
-            } else if (titleLower.contains('pull-up') || titleLower.contains('row') || titleLower.contains('back')) {
-              targetMuscle = 'upper_back';
-            } else if (titleLower.contains('deadlift')) {
-              targetMuscle = 'lower_back';
-            } else if (titleLower.contains('press') || titleLower.contains('raise')) {
-              targetMuscle = 'front_deltoids';
-            } else if (titleLower.contains('tricep') || titleLower.contains('extension')) {
-              targetMuscle = 'triceps';
-            } else if (titleLower.contains('calf')) {
-              targetMuscle = 'calves';
-            } else if (titleLower.contains('hamstring') || titleLower.contains('curl')) {
-              targetMuscle = 'hamstring';
-            } else if (titleLower.contains('thrust') || titleLower.contains('glute')) {
-              targetMuscle = 'gluteal';
-            }
-          }
-          
-          int completedSets = 0;
-          double volume = 0.0;
-          for (final set in ex.sets) {
-            if (set.isCompleted) {
-              completedSets++;
-              volume += set.reps * set.weight;
-            }
-          }
-
-          if (completedSets > 0) {
-            // Muscle stats accumulation
-            muscleRepsCount[targetMuscle] = (muscleRepsCount[targetMuscle] ?? [])
-              ..addAll(List.generate(completedSets, (_) => volume));
-            
-            // Exercise tracking within muscle group
-            final exMap = muscleExerciseCounts[targetMuscle] ?? {};
-            exMap[ex.title] = (exMap[ex.title] ?? 0) + 1;
-            muscleExerciseCounts[targetMuscle] = exMap;
-          }
-        }
+        dailyVolume[date] = (dailyVolume[date] ?? 0.0) + sessionVolume;
       }
 
       // Calculate average accuracy
@@ -237,26 +226,6 @@ class AnalyticsNotifier extends Notifier<AnalyticsState> {
         return MapEntry(entry.key, avg);
       }).toList();
 
-      // 8. Compile Muscle Heatmap matrix stats
-      final Map<String, MuscleStat> muscleStats = {};
-      muscleRepsCount.forEach((muscle, volumes) {
-        final totalSets = volumes.length;
-        final totalVol = volumes.isEmpty ? 0.0 : volumes.reduce((a, b) => a + b);
-        
-        // Sort top exercises by counts
-        final exMap = muscleExerciseCounts[muscle] ?? {};
-        final sortedExercises = exMap.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
-        final topTitles = sortedExercises.take(3).map((e) => e.key).toList();
-
-        muscleStats[muscle] = MuscleStat(
-          muscleName: muscle,
-          totalSets: totalSets,
-          totalVolume: totalVol,
-          topExercises: topTitles,
-        );
-      });
-
       state = AnalyticsState(
         lookbackDays: state.lookbackDays,
         isLoading: false,
@@ -275,6 +244,107 @@ class AnalyticsNotifier extends Notifier<AnalyticsState> {
         errorMessage: 'Aggregation failed: $e',
       );
     }
+  }
+
+  static Map<String, MuscleStat> aggregateMuscleStats(
+    List<WorkoutSessionModel> sessions,
+    Map<String, String> exerciseMuscleMap,
+  ) {
+    final muscleTotalVolumes = <String, double>{};
+    final muscleExerciseCounts = <String, Map<String, int>>{};
+    final muscleMaxWeights = <String, double>{}; // store highest raw weight
+    final muscleSetsCount = <String, int>{};
+    final muscleRepsCount = <String, int>{};
+
+    for (final session in sessions) {
+      for (final ex in session.exercises) {
+        var targetMuscle = exerciseMuscleMap[ex.workoutId] ?? 'full_body';
+        if (targetMuscle == 'full_body') {
+          final titleLower = ex.title.toLowerCase();
+          if (titleLower.contains('bench press') || titleLower.contains('push-up') || titleLower.contains('chest')) {
+            targetMuscle = 'chest';
+          } else if (titleLower.contains('squat') || titleLower.contains('lunge') || titleLower.contains('quad')) {
+            targetMuscle = 'quadriceps';
+          } else if (titleLower.contains('curl') || titleLower.contains('bicep')) {
+            targetMuscle = 'biceps';
+          } else if (titleLower.contains('plank') || titleLower.contains('crunch') || titleLower.contains('raise')) {
+            targetMuscle = 'abs';
+          } else if (titleLower.contains('pull-up') || titleLower.contains('row') || titleLower.contains('back')) {
+            targetMuscle = 'upper_back';
+          } else if (titleLower.contains('deadlift')) {
+            targetMuscle = 'lower_back';
+          } else if (titleLower.contains('press') || titleLower.contains('raise')) {
+            targetMuscle = 'front_deltoids';
+          } else if (titleLower.contains('tricep') || titleLower.contains('extension')) {
+            targetMuscle = 'triceps';
+          } else if (titleLower.contains('calf')) {
+            targetMuscle = 'calves';
+          } else if (titleLower.contains('hamstring') || titleLower.contains('curl')) {
+            targetMuscle = 'hamstring';
+          } else if (titleLower.contains('thrust') || titleLower.contains('glute')) {
+            targetMuscle = 'gluteal';
+          }
+        }
+
+        int completedSetsForExercise = 0;
+        double maxWeightForExercise = 0.0;
+        double volumeForExercise = 0.0;
+
+        for (final set in ex.sets) {
+          if (set.isCompleted) {
+            completedSetsForExercise++;
+            volumeForExercise += set.reps * set.weight;
+            muscleRepsCount[targetMuscle] = (muscleRepsCount[targetMuscle] ?? 0) + set.reps;
+
+            // Update maxWeightForExercise (raw weight used in any single set)
+            if (set.weight > maxWeightForExercise) {
+              maxWeightForExercise = set.weight;
+            }
+          }
+        }
+
+        if (completedSetsForExercise > 0) {
+          // إجمالي الحجم التراكمي للعضلة
+          muscleTotalVolumes[targetMuscle] = (muscleTotalVolumes[targetMuscle] ?? 0.0) + volumeForExercise;
+
+          // إجمالي عدد المجموعات المستهدفة للعضلة
+          muscleSetsCount[targetMuscle] = (muscleSetsCount[targetMuscle] ?? 0) + completedSetsForExercise;
+
+          // تحديث maxWeight للعضلة ككل بأعلى وزن مستخدم في أي مجموعة لأي تمرين يشمل هذه العضلة
+          final currentMuscleMax = muscleMaxWeights[targetMuscle] ?? 0.0;
+          if (maxWeightForExercise > currentMuscleMax) {
+            muscleMaxWeights[targetMuscle] = maxWeightForExercise;
+          }
+
+          final exMap = muscleExerciseCounts[targetMuscle] ?? {};
+          exMap[ex.title] = (exMap[ex.title] ?? 0) + 1;
+          muscleExerciseCounts[targetMuscle] = exMap;
+        }
+      }
+    }
+
+    final muscleStats = <String, MuscleStat>{};
+    muscleTotalVolumes.forEach((muscle, totalVol) {
+      final totalSets = muscleSetsCount[muscle] ?? 0;
+      final totalReps = muscleRepsCount[muscle] ?? 0;
+      final maxWeight = muscleMaxWeights[muscle] ?? 0.0;
+
+      final exMap = muscleExerciseCounts[muscle] ?? {};
+      final sortedExercises = exMap.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      final topTitles = sortedExercises.take(3).map((e) => e.key).toList();
+
+      muscleStats[muscle] = MuscleStat(
+        muscleName: muscle,
+        totalSets: totalSets,
+        totalReps: totalReps,
+        totalVolume: totalVol,
+        maxWeight: maxWeight,
+        topExercises: topTitles,
+      );
+    });
+
+    return muscleStats;
   }
 
   List<WorkoutSessionModel> _generateMockSessions(String uid, int days) {

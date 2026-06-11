@@ -225,27 +225,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       return;
     }
 
-    try {
-      final canCheck = await _localAuth.canCheckBiometrics;
-      final isSupported = await _localAuth.isDeviceSupported();
-      if (!mounted) return;
-      if (!canCheck || !isSupported) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'BIOMETRICS NOT AVAILABLE ON THIS DEVICE.',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-            ),
-            backgroundColor: const Color(0xFF22c55e),
-            behavior: SnackBarBehavior.floating,
+    if (!_canCheckBiometrics) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'BIOMETRICS NOT AVAILABLE ON THIS DEVICE.',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
           ),
-        );
-        setState(() {
-          _fingerprintEnabled = false;
-        });
-        return;
-      }
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      setState(() {
+        _fingerprintEnabled = false;
+      });
+      return;
+    }
 
+    final emailEntered = _emailController.text.trim();
+    if (_hasBiometricToken &&
+        _cachedEmail != null &&
+        _cachedEmail!.trim().toLowerCase() != emailEntered.toLowerCase()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'FINGERPRINT REGISTRATION REJECTED: Fingerprint already registered on this device.',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      setState(() {
+        _fingerprintEnabled = false;
+      });
+      return;
+    }
+
+    try {
       final success = await _authenticateBiometrics();
       if (!mounted) return;
       if (success) {

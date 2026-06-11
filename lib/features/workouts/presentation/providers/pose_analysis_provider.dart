@@ -14,9 +14,12 @@ import '../../domain/services/biomechanics_analyzer.dart';
 
 class PoseAnalysisState {
   final String exerciseName;
+  final String detectedExercise;
   final Map<PoseLandmarkType, PoseLandmark> landmarks;
   final double currentAccuracy;
   final String currentFeedback;
+  final String rightFeedback;
+  final String wrongFeedback;
   final String currentStatus; // 'GOOD', 'WARNING', 'HAZARD'
   final List<double> accuracyHistory;
   final Map<String, String> jointStress;
@@ -27,9 +30,12 @@ class PoseAnalysisState {
 
   PoseAnalysisState({
     required this.exerciseName,
+    this.detectedExercise = '',
     this.landmarks = const {},
     this.currentAccuracy = 0.0,
     this.currentFeedback = 'Align yourself in frame to begin.',
+    this.rightFeedback = '',
+    this.wrongFeedback = '',
     this.currentStatus = 'WARNING',
     this.accuracyHistory = const [],
     this.jointStress = const {},
@@ -49,9 +55,12 @@ class PoseAnalysisState {
 
   PoseAnalysisState copyWith({
     String? exerciseName,
+    String? detectedExercise,
     Map<PoseLandmarkType, PoseLandmark>? landmarks,
     double? currentAccuracy,
     String? currentFeedback,
+    String? rightFeedback,
+    String? wrongFeedback,
     String? currentStatus,
     List<double>? accuracyHistory,
     Map<String, String>? jointStress,
@@ -62,9 +71,12 @@ class PoseAnalysisState {
   }) {
     return PoseAnalysisState(
       exerciseName: exerciseName ?? this.exerciseName,
+      detectedExercise: detectedExercise ?? this.detectedExercise,
       landmarks: landmarks ?? this.landmarks,
       currentAccuracy: currentAccuracy ?? this.currentAccuracy,
       currentFeedback: currentFeedback ?? this.currentFeedback,
+      rightFeedback: rightFeedback ?? this.rightFeedback,
+      wrongFeedback: wrongFeedback ?? this.wrongFeedback,
       currentStatus: currentStatus ?? this.currentStatus,
       accuracyHistory: accuracyHistory ?? this.accuracyHistory,
       jointStress: jointStress ?? this.jointStress,
@@ -156,22 +168,25 @@ class PoseAnalysisNotifier extends Notifier<PoseAnalysisState> {
       final firstPose = poses.first;
       final landmarks = firstPose.landmarks;
 
-      final normalizedExercise = state.exerciseName.toLowerCase();
-
-      Map<String, dynamic> analysis;
-      if (normalizedExercise.contains('plank')) {
-        analysis = BiomechanicsAnalyzer.analyzePlank(landmarks);
-      } else if (normalizedExercise.contains('press') ||
-          normalizedExercise.contains('overhead') ||
-          normalizedExercise.contains('shoulder')) {
-        analysis = BiomechanicsAnalyzer.analyzeOverheadPress(landmarks);
-      } else {
-        analysis = BiomechanicsAnalyzer.analyzeSquat(landmarks);
+      if (BiomechanicsAnalyzer.isFaceOnlyOrNoExercisePose(landmarks, state.exerciseName)) {
+        state = state.copyWith(
+          landmarks: landmarks,
+          currentAccuracy: 0.0,
+          currentFeedback: 'No exercise pose detected. Please step back and assume an exercise pose in full frame.',
+          currentStatus: 'WARNING',
+        );
+        _isProcessing = false;
+        return;
       }
+
+      final analysis = BiomechanicsAnalyzer.analyzeAnyExercise(landmarks, state.exerciseName);
 
       final double score = (analysis['accuracy'] as num).toDouble();
       final String feedback = analysis['feedback'] as String;
+      final String right = analysis['right'] as String? ?? '';
+      final String wrong = analysis['wrong'] as String? ?? '';
       final String status = analysis['status'] as String;
+      final String detectedEx = analysis['detectedExercise'] as String? ?? state.exerciseName;
       final Map<String, String> joints = Map<String, String>.from(
         analysis['jointStress'] ?? {},
       );
@@ -181,8 +196,11 @@ class PoseAnalysisNotifier extends Notifier<PoseAnalysisState> {
 
       state = state.copyWith(
         landmarks: landmarks,
+        detectedExercise: detectedEx,
         currentAccuracy: score,
         currentFeedback: feedback,
+        rightFeedback: right,
+        wrongFeedback: wrong,
         currentStatus: status,
         accuracyHistory: updatedHistory,
         jointStress: joints,
@@ -348,6 +366,37 @@ class PoseAnalysisNotifier extends Notifier<PoseAnalysisState> {
       debugPrint('Firestore pose analysis saving failed: $e');
       state = state.copyWith(isSaving: false);
     }
+  }
+
+  void setUploadedMediaAnalysis({
+    required String exerciseName,
+    required String detectedExercise,
+    required double accuracy,
+    required String feedback,
+    required String rightFeedback,
+    required String wrongFeedback,
+    required String status,
+    required Map<String, String> jointStress,
+    required Map<PoseLandmarkType, PoseLandmark> landmarks,
+  }) {
+    _sessionTimer?.cancel();
+    _poseDetector?.close();
+
+    state = state.copyWith(
+      exerciseName: exerciseName,
+      detectedExercise: detectedExercise,
+      currentAccuracy: accuracy,
+      currentFeedback: feedback,
+      rightFeedback: rightFeedback,
+      wrongFeedback: wrongFeedback,
+      currentStatus: status,
+      jointStress: jointStress,
+      landmarks: landmarks,
+      accuracyHistory: [accuracy],
+      elapsedSeconds: 0,
+      isFinished: false,
+      isSaving: false,
+    );
   }
 
   void reset() {

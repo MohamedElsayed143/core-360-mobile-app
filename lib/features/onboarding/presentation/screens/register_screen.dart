@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
@@ -28,6 +27,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   bool _fingerprintEnabled = false;
   bool _canCheckBiometrics = false;
+  bool _existingFingerprintEnabled = false;
+  String? _savedEmailOnDevice;
 
   @override
   void initState() {
@@ -39,8 +40,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     try {
       final canCheck = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
+      final existingEnabled = await _secureStorage.read(key: 'fingerprint_enabled');
+      final savedEmail = await _secureStorage.read(key: 'saved_email');
       setState(() {
         _canCheckBiometrics = canCheck && isSupported;
+        _existingFingerprintEnabled = (existingEnabled == 'true');
+        _savedEmailOnDevice = savedEmail;
       });
     } catch (_) {}
   }
@@ -48,7 +53,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Future<bool> _authenticateBiometrics() async {
     try {
       final authenticated = await _localAuth.authenticate(
-        localizedReason: 'Scan fingerprint to authenticate secure access to Core-360',
+        localizedReason: 'Verify fingerprint to enable quick login for Core-360',
         options: const AuthenticationOptions(
           biometricOnly: true,
           stickyAuth: true,
@@ -71,82 +76,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
-  Future<void> _handleFingerprintToggle(bool val) async {
-    if (!val) {
+  // عند تغيير حالة الـ Switch، نطلب المصادقة فوراً إذا كان المستخدم يريد التفعيل
+  Future<void> _handleFingerprintToggle(bool newValue) async {
+    if (!newValue) {
+      // إيقاف البصمة - مباشر بدون مصادقة
       setState(() {
         _fingerprintEnabled = false;
       });
       return;
     }
 
-    try {
-      final canCheck = await _localAuth.canCheckBiometrics;
-      final isSupported = await _localAuth.isDeviceSupported();
-      if (!mounted) return;
-      if (!canCheck || !isSupported) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'BIOMETRICS NOT AVAILABLE ON THIS DEVICE.',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-            ),
-            backgroundColor: const Color(0xFF22c55e),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        setState(() {
-          _fingerprintEnabled = false;
-        });
-        return;
-      }
-
-      final existingEnabled = await _secureStorage.read(key: 'fingerprint_enabled');
-      if (!mounted) return;
-
-      if (existingEnabled == 'true') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'FINGERPRINT REGISTRATION REJECTED: Fingerprint already registered on this device.',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-            ),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        setState(() {
-          _fingerprintEnabled = false;
-        });
-        return;
-      }
-
-      final success = await _authenticateBiometrics();
-      if (!mounted) return;
-      if (success) {
-        setState(() {
-          _fingerprintEnabled = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'BIOMETRIC SCAN SUCCEEDED. FINGERPRINT ENROLLED FOR SIGN-UP.',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.black),
-            ),
-            backgroundColor: const Color(0xFF22c55e),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      } else {
-        setState(() {
-          _fingerprintEnabled = false;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
+    // محاولة تفعيل البصمة
+    if (!_canCheckBiometrics) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'BIOMETRIC AUTHENTICATION ERROR: $e',
+            'BIOMETRICS NOT AVAILABLE ON THIS DEVICE.',
             style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
           ),
           backgroundColor: Colors.redAccent,
@@ -156,6 +101,60 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       setState(() {
         _fingerprintEnabled = false;
       });
+      return;
+    }
+
+    final emailEntered = _emailController.text.trim();
+    if (_existingFingerprintEnabled &&
+        _savedEmailOnDevice != null &&
+        _savedEmailOnDevice!.trim().toLowerCase() != emailEntered.toLowerCase()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'FINGERPRINT ALREADY REGISTERED FOR ANOTHER ACCOUNT ON THIS DEVICE.',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      setState(() {
+        _fingerprintEnabled = false;
+      });
+      return;
+    }
+
+    // عرض مصادقة البصمة فوراً
+    final success = await _authenticateBiometrics();
+    if (!mounted) return;
+    if (success) {
+      setState(() {
+        _fingerprintEnabled = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'FINGERPRINT ENABLED SUCCESSFULLY.',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          backgroundColor: const Color(0xFF22c55e),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      setState(() {
+        _fingerprintEnabled = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'FINGERPRINT AUTHENTICATION FAILED. PLEASE TRY AGAIN.',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -171,8 +170,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final existingEnabled = await _secureStorage.read(key: 'fingerprint_enabled');
-    if (_fingerprintEnabled && existingEnabled == 'true') {
+    final emailEntered = _emailController.text.trim();
+    if (_fingerprintEnabled &&
+        _existingFingerprintEnabled &&
+        _savedEmailOnDevice != null &&
+        _savedEmailOnDevice!.trim().toLowerCase() != emailEntered.toLowerCase()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -263,12 +265,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           child: Center(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 400),
+                constraints: const BoxConstraints(maxWidth: 450),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF252d3a).withValues(alpha: 0.87),
-                  borderRadius: BorderRadius.circular(16),
+                  color: const Color(0xFF252d3a).withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(
                       color: const Color(0xFF3d4d6b), width: 0.5),
                   boxShadow: [
@@ -280,7 +282,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ],
                 ),
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 32, vertical: 40),
+                    horizontal: 28, vertical: 36),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -288,7 +290,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildLogo(),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 28),
                       Text(
                         'Create an account',
                         textAlign: TextAlign.center,
@@ -298,7 +300,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Text(
                         'Join us and get started today',
                         textAlign: TextAlign.center,
@@ -308,6 +310,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ),
                       ),
                       const SizedBox(height: 32),
+                      // Name field
                       Text(
                         'Full Name',
                         style: GoogleFonts.outfit(
@@ -332,7 +335,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 18),
+                      // Email field
                       Text(
                         'Email address',
                         style: GoogleFonts.outfit(
@@ -358,7 +362,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 18),
+                      // Password field
                       Text(
                         'Password',
                         style: GoogleFonts.outfit(
@@ -396,7 +401,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 18),
+                      // Confirm Password field
                       Text(
                         'Confirm Password',
                         style: GoogleFonts.outfit(
@@ -434,57 +440,55 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           return null;
                         },
                       ),
+                      const SizedBox(height: 20),
+                      // Fingerprint toggle section (redesigned for better spacing and single-tap)
                       if (_canCheckBiometrics) ...[
-                        const SizedBox(height: 20),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        Container(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: const Color(0xFF323b49),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: _fingerprintEnabled 
-                                  ? const Color(0xFF22c55e)
+                                  ? const Color(0xFF22c55e).withValues(alpha: 0.6)
                                   : const Color(0xFF3d4a5e).withValues(alpha: 0.5), 
-                              width: 0.5,
+                              width: 0.8,
                             ),
                           ),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.fingerprint,
-                                    color: _fingerprintEnabled ? const Color(0xFF22c55e) : const Color(0xFF94a3b8),
-                                    size: 24,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Enable Fingerprint Quick Login',
-                                        style: GoogleFonts.outfit(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                        ),
+                              Icon(
+                                Icons.fingerprint,
+                                color: _fingerprintEnabled ? const Color(0xFF22c55e) : const Color(0xFF94a3b8),
+                                size: 28,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Fingerprint Quick Login',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
                                       ),
-                                      Text(
-                                        'Secure, instant bio-identity setup',
-                                        style: GoogleFonts.outfit(
-                                          color: const Color(0xFF94a3b8),
-                                          fontSize: 10,
-                                        ),
+                                    ),
+                                    Text(
+                                      'Enable biometric authentication for faster sign-in',
+                                      style: GoogleFonts.outfit(
+                                        color: const Color(0xFF94a3b8),
+                                        fontSize: 11,
                                       ),
-                                    ],
-                                  ),
-                                ],
+                                    ),
+                                  ],
+                                ),
                               ),
                               Switch(
                                 value: _fingerprintEnabled,
-                                activeThumbColor: const Color(0xFF22c55e),
+                                activeColor: const Color(0xFF22c55e),
                                 activeTrackColor: const Color(0xFF22c55e).withValues(alpha: 0.3),
                                 inactiveThumbColor: const Color(0xFF94a3b8),
                                 inactiveTrackColor: const Color(0xFF1e293b),
@@ -494,12 +498,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 24),
+                      // Submit button
                       Container(
-                        height: 48,
+                        height: 52,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            )
+                          ],
                         ),
                         child: ElevatedButton(
                           onPressed: authState is AuthLoading ? null : _submit,
@@ -507,20 +519,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             backgroundColor: Colors.transparent,
                             shadowColor: Colors.transparent,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: Text(
                             'Sign Up',
                             style: GoogleFonts.outfit(
-                              fontSize: 15,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.black,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -564,25 +576,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           GoogleFonts.outfit(color: const Color(0xFF94a3b8), fontSize: 14),
       suffixIcon: suffixIcon,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide:
             BorderSide(color: const Color(0xFF3d4a5e).withValues(alpha: 0.5), width: 0.5),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide:
             BorderSide(color: const Color(0xFF3d4a5e).withValues(alpha: 0.5), width: 0.5),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Color(0xFF22c55e), width: 1),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Colors.redAccent, width: 1),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Colors.redAccent, width: 1),
       ),
       contentPadding:
@@ -598,7 +610,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           Text(
             'CORE 360',
             style: GoogleFonts.jetBrainsMono(
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               letterSpacing: 3,
               color: Colors.white,

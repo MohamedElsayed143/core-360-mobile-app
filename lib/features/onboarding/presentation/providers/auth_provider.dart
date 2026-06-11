@@ -132,10 +132,14 @@ class AuthNotifier extends Notifier<AuthState> {
           await storage.write(key: 'fingerprint_enabled', value: 'true');
           ref.read(biometricEnabledProvider.notifier).setEnabled(true);
         } else {
-          await storage.delete(key: 'saved_email');
-          await storage.delete(key: 'saved_password');
-          await storage.write(key: 'fingerprint_enabled', value: 'false');
-          ref.read(biometricEnabledProvider.notifier).setEnabled(false);
+          // Only clear local credentials if they belong to the current email being registered
+          final savedEmail = await storage.read(key: 'saved_email');
+          if (savedEmail?.trim().toLowerCase() == email.trim().toLowerCase()) {
+            await storage.delete(key: 'saved_email');
+            await storage.delete(key: 'saved_password');
+            await storage.write(key: 'fingerprint_enabled', value: 'false');
+            ref.read(biometricEnabledProvider.notifier).setEnabled(false);
+          }
         }
       }
 
@@ -361,6 +365,20 @@ class AuthNotifier extends Notifier<AuthState> {
         return 'Biometric authentication is not supported or set up on this device.';
       }
 
+      final currentUser = fb.FirebaseAuth.instance.currentUser;
+      if (currentUser == null || currentUser.email == null) {
+        return 'No authenticated user found.';
+      }
+
+      const storage = FlutterSecureStorage();
+      final existingEnabled = await storage.read(key: 'fingerprint_enabled');
+      final savedEmail = await storage.read(key: 'saved_email');
+      if (existingEnabled == 'true' &&
+          savedEmail != null &&
+          savedEmail.trim().toLowerCase() != currentUser.email!.trim().toLowerCase()) {
+        return 'Fingerprint already registered on this device for another account.';
+      }
+
       final authenticated = await localAuth.authenticate(
         localizedReason: 'Confirm your biometric identity to enable instant login',
         options: const AuthenticationOptions(
@@ -373,12 +391,6 @@ class AuthNotifier extends Notifier<AuthState> {
         return 'Biometric authentication cancelled or failed.';
       }
 
-      final currentUser = fb.FirebaseAuth.instance.currentUser;
-      if (currentUser == null || currentUser.email == null) {
-        return 'No authenticated user found.';
-      }
-
-      const storage = FlutterSecureStorage();
       await storage.write(key: 'saved_email', value: currentUser.email!.trim());
       await storage.write(key: 'saved_password', value: password);
       await storage.write(key: 'fingerprint_enabled', value: 'true');
@@ -425,14 +437,28 @@ class BiometricEnabledNotifier extends Notifier<bool> {
 
   @override
   bool build() {
-    _load();
+    final authState = ref.watch(authProvider);
+    _load(authState);
     return false;
   }
 
-  Future<void> _load() async {
+  Future<void> _load(AuthState authState) async {
     try {
+      String? currentUserEmail;
+      if (authState is AuthenticatedWithProfile) {
+        currentUserEmail = authState.user.email;
+      } else if (authState is AuthenticatedWithoutProfile) {
+        currentUserEmail = authState.user.email;
+      }
+
+      if (currentUserEmail == null) {
+        state = false;
+        return;
+      }
+
       final enabled = await _storage.read(key: 'fingerprint_enabled');
-      state = enabled == 'true';
+      final savedEmail = await _storage.read(key: 'saved_email');
+      state = (enabled == 'true') && (savedEmail?.trim().toLowerCase() == currentUserEmail.trim().toLowerCase());
     } catch (_) {
       state = false;
     }
